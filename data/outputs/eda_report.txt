@@ -1,0 +1,35 @@
+=== EDA REPORT ===
+Shape: (284807, 31)
+Missing values: 0
+
+Class Distribution (count):
+Class
+0    284315
+1       492
+
+Class Distribution (percent):
+Class
+0    0.998273
+1    0.001727
+
+Amount Statistics:
+count    284807.000000
+mean         88.349619
+std         250.120109
+min           0.000000
+25%           5.600000
+50%          22.000000
+75%          77.165000
+max       25691.160000
+
+Top Outlier Columns (IQR method):
+V27       39163
+Amount    31904
+V28       30342
+V20       27770
+V8        24134
+V6        22965
+V23       18541
+V12       15348
+V21       14497
+V14       14149

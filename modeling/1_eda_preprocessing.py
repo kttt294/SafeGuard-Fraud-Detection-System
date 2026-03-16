@@ -1,0 +1,169 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pickle
+import os
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import RobustScaler
+
+# Thư mục lưu kết quả
+OUTPUT_DIR = '../data/outputs'
+PROCESSED_DIR = '../data/processed'
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(PROCESSED_DIR, exist_ok=True)
+
+# 1. Load Dataset
+print("--- Loading Dataset ---")
+file_path = '../data/raw/creditcard.csv'
+
+# Hỗ trợ cho Colab: Nếu không tìm thấy file cục bộ, hãy thử tải từ URL
+if not os.path.exists(file_path):
+    print(f"[INFO] Không tìm thấy file tại '{file_path}'.")
+    # Thay link_url bằng link GitHub Release sau khi bạn upload
+    link_url = "LINK_GITHUB_RELEASE_CUA_BAN_TAI_DAY" 
+    if link_url.startswith("http"):
+        print(f"Đang thử tải dữ liệu từ: {link_url}...")
+        import subprocess
+        os.makedirs('../data/raw', exist_ok=True)
+        # Lệnh tải file (Windows/Linux/Colab đều dùng được qua python)
+        try:
+            import requests
+            r = requests.get(link_url, stream=True)
+            with open(file_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk: f.write(chunk)
+            print("Tải dữ liệu thành công!")
+        except Exception as e:
+            print(f"Lỗi khi tải dữ liệu: {e}")
+    else:
+        print("Vui lòng đảm bảo file 'creditcard.csv' nằm trong thư mục 'data/raw/'.")
+
+df = pd.read_csv(file_path)
+
+# 2. EDA Cơ bản
+print("\n--- Basic Information ---")
+print(df.info())
+
+missing = df.isnull().sum().sum()
+print(f"\n--- Missing Values ---\nTổng số giá trị thiếu: {missing}")
+
+class_counts = df['Class'].value_counts()
+class_pct = df['Class'].value_counts(normalize=True)
+print("\n--- Target Distribution (Class) ---")
+print(class_counts)
+print(class_pct)
+
+# Phân tích Outliers bằng IQR
+Q1 = df.quantile(0.25)
+Q3 = df.quantile(0.75)
+IQR = Q3 - Q1
+outlier_counts = ((df < (Q1 - 1.5 * IQR)) | (df > (Q3 + 1.5 * IQR))).sum()
+print("\n--- Top 10 Columns With Most Outliers (IQR method) ---")
+print(outlier_counts.sort_values(ascending=False).head(10))
+
+# Lưu báo cáo EDA ra file text
+with open(os.path.join(OUTPUT_DIR, 'eda_report.txt'), 'w', encoding='utf-8') as f:
+    f.write(f"=== EDA REPORT ===\n")
+    f.write(f"Shape: {df.shape}\n")
+    f.write(f"Missing values: {missing}\n\n")
+    f.write(f"Class Distribution (count):\n{class_counts.to_string()}\n\n")
+    f.write(f"Class Distribution (percent):\n{class_pct.to_string()}\n\n")
+    f.write(f"Amount Statistics:\n{df['Amount'].describe().to_string()}\n\n")
+    f.write(f"Top Outlier Columns (IQR method):\n{outlier_counts.sort_values(ascending=False).head(10).to_string()}\n")
+print(f"\n[INFO] Đã lưu báo cáo EDA tại '{OUTPUT_DIR}/eda_report.txt'")
+
+# 3. Visualization nâng cao: Ma trận Tương quan (Correlation Heatmap)
+print("\n--- Generating Correlation Heatmap ---")
+plt.figure(figsize=(12, 10))
+corr = df.corr()
+sns.heatmap(corr, cmap='coolwarm_r', annot_kws={'size':20})
+plt.title('Ma trận Tương quan (Gợi ý đặc trưng quan trọng)', fontsize=14)
+plt.savefig(os.path.join(OUTPUT_DIR, 'correlation_heatmap.png'))
+plt.close()
+
+# In ra các cột có tương quan cao nhất với Class để "bàn giao" cho nhóm Modeling
+top_corr_features = corr['Class'].abs().sort_values(ascending=False).head(10)
+print("\n--- Top 10 đặc trưng tương quan mạnh nhất với Class ---")
+print(top_corr_features)
+
+# Visualization 1: Phân phối của Class (Mất cân bằng)
+plt.figure(figsize=(8, 6))
+sns.countplot(x='Class', data=df, palette='viridis')
+plt.title('Phân phối Giao dịch: Hợp lệ (0) vs Gian lận (1)')
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, 'distribution_class.png'))
+plt.close()
+print(f"\n[INFO] Đã lưu biểu đồ phân phối Class tại '{OUTPUT_DIR}/distribution_class.png'")
+
+# Visualization 2: Phân phối của Amount (Dòng tiền)
+plt.figure(figsize=(10, 6))
+sns.histplot(df['Amount'], kde=True, color='steelblue')
+plt.title('Phân phối của Số tiền Giao dịch (Amount)')
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, 'distribution_amount.png'))
+plt.close()
+print(f"[INFO] Đã lưu biểu đồ phân phối Amount tại '{OUTPUT_DIR}/distribution_amount.png'")
+
+# Visualization 3: Boxplot Amount theo Class
+plt.figure(figsize=(8, 6))
+sns.boxplot(x='Class', y='Amount', data=df, palette='Set2')
+plt.title('Số tiền Giao dịch theo từng Class')
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, 'boxplot_amount_by_class.png'))
+plt.close()
+print(f"[INFO] Đã lưu boxplot Amount theo Class tại '{OUTPUT_DIR}/boxplot_amount_by_class.png'")
+
+# 3. Preprocessing: Scaling (Time & Amount)
+# Sử dụng RobustScaler vì dữ liệu tài chính thường có Outliers lớn
+print("\n--- Scaling Time and Amount ---")
+rob_scaler = RobustScaler()
+
+df['scaled_amount'] = rob_scaler.fit_transform(df['Amount'].values.reshape(-1,1))
+df['scaled_time'] = rob_scaler.fit_transform(df['Time'].values.reshape(-1,1))
+
+# Loại bỏ cột gốc sau khi đã scale
+df.drop(['Time','Amount'], axis=1, inplace=True)
+
+# Đưa các cột đã scale lên đầu để dễ quan sát
+scaled_amount = df['scaled_amount']
+scaled_time = df['scaled_time']
+df.drop(['scaled_amount', 'scaled_time'], axis=1, inplace=True)
+df.insert(0, 'scaled_amount', scaled_amount)
+df.insert(1, 'scaled_time', scaled_time)
+
+# 4. Tách tập Train và Test (Lưu ý: Không chạm vào Test cho đến bước cuối)
+print("\n--- Splitting Train and Test sets ---")
+X = df.drop('Class', axis=1)
+y = df['Class']
+
+# Stratify=y để đảm bảo tỷ lệ Class 0/1 đồng đều ở cả 2 tập
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+print(f"Shape of X_train: {X_train.shape}")
+print(f"Shape of X_test: {X_test.shape}")
+print(f"Tỷ lệ gian lận trong tập Train: {y_train.mean():.4%}")
+print(f"Tỷ lệ gian lận trong tập Test: {y_test.mean():.4%}")
+
+# 5. Lưu lại dữ liệu đã tiền xử lý
+print("\n--- Saving Preprocessed Data ---")
+
+# Lưu dạng CSV
+X_train.to_csv(os.path.join(PROCESSED_DIR, 'X_train.csv'), index=False)
+X_test.to_csv(os.path.join(PROCESSED_DIR, 'X_test.csv'), index=False)
+y_train.to_csv(os.path.join(PROCESSED_DIR, 'y_train.csv'), index=False, header=True)
+y_test.to_csv(os.path.join(PROCESSED_DIR, 'y_test.csv'), index=False, header=True)
+print(f"[INFO] Đã lưu X_train, X_test, y_train, y_test dạng CSV vào thư mục '{PROCESSED_DIR}/'")
+
+# Lưu dạng pickle (load nhanh hơn nhiều trong các bước tiếp theo)
+with open(os.path.join(PROCESSED_DIR, 'data_splits.pkl'), 'wb') as f:
+    pickle.dump({
+        'X_train': X_train,
+        'X_test': X_test,
+        'y_train': y_train,
+        'y_test': y_test
+    }, f)
+print(f"[INFO] Đã lưu toàn bộ data splits dạng pickle tại '{PROCESSED_DIR}/data_splits.pkl'")
+
+print("\n--- Bước 1 hoàn tất! Sẵn sàng cho Bước 2: Modeling & Spot-checking ---")
+print(f"Tất cả kết quả được lưu trong thư mục: '{OUTPUT_DIR}/'")

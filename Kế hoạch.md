@@ -1,0 +1,92 @@
+# Implementation Plan: Credit Card Fraud Detection
+
+Dự án này xây dựng một hệ thống phát hiện giao dịch gian lận sử dụng Machine Learning, tập trung vào việc thể hiện các kỹ thuật xử lý dữ liệu phức tạp và đánh giá mô hình chuyên sâu.
+
+### Collect data -> EDA -> data cleaning -> feature engineering -> stratified split -> training
+
+### 1. Khám phá & Tiền xử lý Dữ liệu (EDA & Preprocessing)
+
+1. **EDA (Exploratory Data Analysis – phân tích khám phá dữ liệu):** là bước khám phá và hiểu dữ liệu trước khi xây dựng mô hình. Sử dụng `seaborn` và `matplotlib` để phân tích sự mất cân bằng giữa giao dịch hợp lệ và gian lận. Mục đích chính là để hiểu dữ liệu trước khi đưa vào huấn luyện:
+
+   1. xem cấu trúc dữ liệu: số cột, số dòng, kiểu dữ liệu
+   2. phát hiện missing values và outliers
+   3. hiểu phân bố dữ liệu
+   4. tìm mối quan hệ giữa các biến
+   5. kiểm tra dữ liệu có hợp lý không
+   6. VD: EDA giúp trả lời: diện tích trung bình bao nhiêu, giá nhà phân bố thế nào, diện tích và giá có tương quan không. EDA thường chiếm  **60–70% thời gian làm ML project** .
+   7. Các bước EDA thường làm:
+
+      1. xem tổng quan dữ liệu: df.head(), df.info(), df.describe()
+      2. kiểm tra missing values: df.isnull().sum()
+      3. xem phân bố dữ liệu: dùng biểu đồ histgram, boxplot, density plot
+      4. tìm outliers: có thể dùng boxplot, Z-score, IQR
+      5. phân tích tương quan: df.corr() hoặc vẽ heatmap. Mục tiêu: xem biến nào liên quan đến target và phát hiện multicollinearity
+   8. EDA quan trọng vì, nếu không làm EDA thì dễ: train model với data lỗi, bị bias, có outliers phá model, feature không liên quan
+   9. EDA phải kiểm tra xem features nào trực tiếp tiết lộ target, ví dụ predict customer churn nhưng trong dataset có cột account_closed_date thì ko được.
+   10. Khi làm EDA cho dataset lớn (hơn 1 triệu dòng), mục tiêu không phải là vẽ thật nhiều biểu đồ mà là cấu trúc dữ liệu NHANH và phát hiện vấn đề quan trọng. Checklist chuẩn:
+   11. + kiểm tra cấu trúc dữ liệu trước: hiểu dataset có gì: bao nhiêu rows và columns, kiểu dữ liệu của mỗi cột, cột nào là categorical / numerical / datetime
+       + sampling dữ liệu: dataset lớn thì không nên vẽ biểu đồ trực tiếp, thay vào đó sample_df = df.sample(100_000) -> lấy 1% hoặc 100_000 dòng sau đó làm EDA trên sample -> nhanh, tiết kiệm RAM, pattern thường vẫn giống
+       + sau đó tiến hành như bình thường
+2. **Handling Missing Values:** Sử dụng `KNNImputer` hoặc `IterativeImputer` thay vì Mean/Median đơn giản. *Qua thăm dò dữ liệu (EDA), tập dữ liệu Credit Card Fraud không ghi nhận giá trị thiếu (Missing values). Tuy nhiên, trong quy trình xây dựng Machine Learning Pipeline vẫn thiết lập sẵn các bước kiểm tra. Nếu trong tương lai dữ liệu đầu vào có biến động, các kỹ thuật như **KNN Imputer** hoặc **Iterative Imputer** sẽ được cân nhắc sử dụng thay vì Mean/Median để đảm bảo tính tương quan giữa các đặc trưng ẩn danh (V1-V28) không bị phá vỡ. **Tại sao dùng Imputer cao cấp cho dữ liệu PCA (V1-V28)?** Các đặc trưng V1-V28 là kết quả của phép chiếu toán học (PCA) nhằm giữ lại các mối quan hệ tuyến tính giữa các biến gốc. Việc sử dụng **KNN Imputer** hoặc **Iterative Imputer** giúp giá trị được điền vào tuân thủ **Phân phối đa biến (Multivariate Distribution)** của tập dữ liệu. Điều này đảm bảo rằng các điểm dữ liệu được điền mới không trở thành "Outliers toán học", giúp các mô hình nhạy cảm như SVM hay XGBoost đạt hiệu năng ổn định hơn. Hãy tưởng tượng bạn có 2 cột: **Chiều cao** và  **Cân nặng** . Hai cột này có tương quan thuận rất mạnh (người cao thường nặng hơn). Nếu một người bị thiếu Cân nặng, nhưng bạn lại điền bằng  **Cân nặng trung bình của cả thế giới** , con số đó sẽ hoàn toàn không khớp với Chiều cao thực tế của người đó. H**ệ quả:** Bạn đã tạo ra một "điểm dữ liệu giả" vô lý (ví dụ: cao 2m nhưng nặng 50kg). Mối quan hệ toán học giữa các cột bị phá vỡ. Máy sẽ bị rối khi học các điểm dữ liệu mâu thuẫn như vậy.
+3. **Scaling:** Áp dụng `RobustScaler` vì dữ liệu tài chính thường chứa nhiều Outliers. Nếu dùng `StandardScaler`, kết quả sẽ rất tệ. Ta cũng **không nên xóa** những Outliers này, vì trong ngành ngân hàng, giao dịch bất thường (Outlier) chính là dấu hiệu tiềm năng của gian lận. RonustScaler dùng để scale các feature nhưng ít bị ảnh hưởng bởi outliers, thường dựa trên median và IQR = Q3 - Q1 thay vì mean và std như standardScaler
+
+   - x(scaled) = (**x**−median) / **I**QR
+4. **Imbalanced Data:** Sử dụng `SMOTE` (Synthetic Minority Over-sampling Technique) để cân bằng dữ liệu. Không *SMOTE trong tiền xử lý mà đưa vào Pipeline để tránh Data Leakage trong quá trình Cross-Validation*
+
+### 2. Xây dựng & Sàng lọc Mô hình (Modeling & Spot-checking)
+
+- **Baseline:** Logistic Regression.
+- **Advanced Models:** Random Forest, XGBoost, CatBoost.
+- **Quy trình Huấn luyện:** Huấn luyện nhanh các mô hình với tham số mặc định (Default) bằng **Cross-Validation 5-fold**.
+  - **Chi tiết kỹ thuật:** Chia tập Train thành 5 phần (folds). Thực hiện lặp 5 lần; mỗi lần huấn luyện mô hình **hoàn toàn mới từ đầu** trên 4 phần và kiểm tra trên 1 phần còn lại.
+  - **Kết quả:** Lấy trung bình cộng điểm số của 5 lần chạy để làm "chứng chỉ năng lực" cho thuật toán.
+  - **Mục tiêu:** Đánh giá độ ổn định và khả năng tổng quát hóa của mô hình, từ đó tìm ra "Shortlist" (2-3 mô hình tiềm năng nhất).
+- **Pipeline:** Sử dụng `sklearn.pipeline.Pipeline` kết hợp Preprocessing (Scaling + SMOTE) và Modeling để tránh Data Leakage.
+
+### 3. Tối ưu & Đánh giá Chuyên sâu (Optimization & Evaluation)
+
+> **Quy tắc quan trọng:** Tập **Test** chỉ được sử dụng DUY NHẤT một lần ở cuối bước 3 để báo cáo kết quả cuối cùng. Tuyệt đối không dùng tập Test để chọn mô hình hoặc chỉnh tham số.
+
+- **Hyperparameter Tuning:** Thực hiện `RandomizedSearchCV` cho các mô hình trong Shortlist dựa trên tập **Train**.
+- **Final Selection:** So sánh các mô hình ĐÃ tối ưu (dựa trên kết quả Cross-validation trên tập Train) để chọn ra mô hình cuối cùng.
+- **Metrics:** Tập trung vào **Precision-Recall Curve (AUPRC)**.
+- **Final Evaluation:** Chạy mô hình tốt nhất lên tập **Test** để xem hiệu suất thực tế.
+
+### 4. Giải thích & Lưu trữ (Interpretation & Export)
+
+* **Interpretability:** Sử dụng `SHAP` values để giải thích lý do mô hình dự đoán gian lận cho từng giao dịch cụ thể.
+* **Model Export:** Lưu mô hình đã huấn luyện (Pipeline hoàn chỉnh) thành file `.pkl` để sử dụng cho Web App.
+
+### 5. Ứng dụng Web (Web Application - Streamlit)
+
+* **SafeGuard Banking Dashboard:** Xây dựng giao diện Web cho phép:
+  * Nhập thông số giao dịch hoặc upload CSV để kiểm tra gian lận.
+  * Hiển thị cảnh báo đỏ nếu phát hiện gian lận.
+  * Trực quan hóa lý do mô hình đưa ra quyết định (Explainable AI).
+
+Nhóm xây dựng một **Hệ thống AI tích hợp (Embedded AI System)** chuyên biệt cho hạ tầng tài chính. Hệ thống được thiết kế theo kiến trúc  **Privacy-Preserving Machine Learning** .
+
+* **Phía Ngân hàng:** Giữ bí mật về ý nghĩa các đặc trưng gốc.
+* **Phía Kỹ sư (Chúng em):** Xây dựng mô hình dựa trên các đặc trưng nén (PCA) để bảo mật.
+* **Phía Vận hành:** Dashboard này cung cấp giao diện trực quan để lọc ra 0.17% giao dịch gian lận từ hàng triệu giao dịch mỗi ngày giúp tối ưu hóa nguồn lực nhân sự.
+
+*Để đảm bảo luồng dữ liệu giữa các phòng ban ngân hàng diễn ra thông suốt, hệ thống cung cấp file Template chuẩn để bộ phận IT có thể mapping dữ liệu vào đúng form.*
+
+=> **Giải pháp Công nghệ Tài chính (FinTech Solution) -> Hệ thống hỗ trợ chuyển viên phòng rủi ro**
+
+ *"V1 đến V28 là gì?"* 
+
+> *"Trong thực tiễn ngân hàng, đây là các **đặc trưng hành vi và thiết bị** đã được mã hóa. Ví dụ V1 có thể là chỉ số về vị trí địa lý, V2 là thông tin về loại thiết bị. Ngân hàng không cung cấp tên gốc của các cột này cho nhóm phát triển để bảo vệ quyền riêng tư của khách hàng, nhưng mô hình vẫn có thể tìm ra các mẫu hình gian lận từ những con số đã mã hóa này*
+
+## Verification Plan
+
+### Automated Tests
+
+- Kiểm tra tính đúng đắn của Pipeline (không bị lỗi khi `fit` và `predict`).
+- Kiểm tra tỷ lệ gian lận sau khi áp dụng SMOTE.
+- So sánh hiệu suất giữa Baseline và các mô hình nâng cao qua các chỉ số F1, AUC-ROC.
+
+### Manual Verification
+
+- Kiểm tra các biểu đồ EDA để đảm bảo tính logic của dữ liệu.
+- Phân tích danh sách các đặc trưng quan trọng nhất (Feature Importance) xem có phù hợp với thực tế tài chính không.
