@@ -15,30 +15,16 @@ os.makedirs(PROCESSED_DIR, exist_ok=True)
 
 # 1. Load Dataset
 print("--- Loading Dataset ---")
+
 file_path = '../data/raw/creditcard.csv'
 
-# Hỗ trợ cho Colab: Nếu không tìm thấy file cục bộ, hãy thử tải từ URL
+# Kiểm tra file sự tồn tại của file CSV
 if not os.path.exists(file_path):
-    print(f"[INFO] Không tìm thấy file tại '{file_path}'.")
-    # Thay link_url bằng link GitHub Release sau khi bạn upload
-    link_url = "LINK_GITHUB_RELEASE_CUA_BAN_TAI_DAY" 
-    if link_url.startswith("http"):
-        print(f"Đang thử tải dữ liệu từ: {link_url}...")
-        import subprocess
-        os.makedirs('../data/raw', exist_ok=True)
-        # Lệnh tải file (Windows/Linux/Colab đều dùng được qua python)
-        try:
-            import requests
-            r = requests.get(link_url, stream=True)
-            with open(file_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=1024):
-                    if chunk: f.write(chunk)
-            print("Tải dữ liệu thành công!")
-        except Exception as e:
-            print(f"Lỗi khi tải dữ liệu: {e}")
-    else:
-        print("Vui lòng đảm bảo file 'creditcard.csv' nằm trong thư mục 'data/raw/'.")
+    print(f"[ERROR] Không tìm thấy file '{file_path}'.")
+    print("Vui lòng đảm bảo bạn đã giải nén file creditcard.zip vào thư mục data/raw/")
+    exit()
 
+print(f"[INFO] Bắt đầu đọc dữ liệu từ: {file_path}")
 df = pd.read_csv(file_path)
 
 # 2. EDA Cơ bản

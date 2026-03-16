@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Đường dẫn file
-MODEL_PATH = '../modeling/trained_model.pkl'
+MODEL_PATH = '../modeling/model.pkl'
 
 # Tải mô hình
 @st.cache_resource

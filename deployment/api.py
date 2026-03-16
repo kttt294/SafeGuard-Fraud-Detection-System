@@ -15,7 +15,7 @@ app = FastAPI(
 )
 
 # 2. Cấu hình mô hình
-MODEL_PATH = '../modeling/trained_model.pkl'
+MODEL_PATH = '../modeling/model.pkl'
 FEATURE_COLUMNS = ['scaled_amount', 'scaled_time'] + [f'V{i}' for i in range(1, 29)]
 
 # 3. Load model khi khởi động

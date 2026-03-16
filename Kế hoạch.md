@@ -35,9 +35,15 @@ Dự án này xây dựng một hệ thống phát hiện giao dịch gian lận
 
 ### 2. Xây dựng & Sàng lọc Mô hình (Modeling & Spot-checking)
 
+- có thể load data đã được chia với lệnh:
+- import pickle
+  with open('../data/processed/data_splits.pkl', 'rb') as f:
+      data = pickle.load(f)
+  X_train, X_test, y_train, y_test = data['X_train'], data['X_test'], data['y_train'], data['y_test']
 - **Baseline:** Logistic Regression.
 - **Advanced Models:** Random Forest, XGBoost, CatBoost.
 - **Quy trình Huấn luyện:** Huấn luyện nhanh các mô hình với tham số mặc định (Default) bằng **Cross-Validation 5-fold**.
+
   - **Chi tiết kỹ thuật:** Chia tập Train thành 5 phần (folds). Thực hiện lặp 5 lần; mỗi lần huấn luyện mô hình **hoàn toàn mới từ đầu** trên 4 phần và kiểm tra trên 1 phần còn lại.
   - **Kết quả:** Lấy trung bình cộng điểm số của 5 lần chạy để làm "chứng chỉ năng lực" cho thuật toán.
   - **Mục tiêu:** Đánh giá độ ổn định và khả năng tổng quát hóa của mô hình, từ đó tìm ra "Shortlist" (2-3 mô hình tiềm năng nhất).

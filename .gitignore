@@ -208,7 +208,8 @@ __marimo__/
 
 # --- PROJECT SPECIFIC ---
 data/raw/creditcard.csv
-data/processed/
+data/processed/*
+!data/processed/.gitkeep
 
 # Ignore trained models (large binaries)
 modeling/*.pkl
