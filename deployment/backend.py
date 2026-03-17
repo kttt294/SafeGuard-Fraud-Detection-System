@@ -129,11 +129,11 @@ async def verify_bulk(payload: BulkTransactions):
     try:
         # 1. Chuyển đổi và Scale dữ liệu
         if scaler:
-            # Scale dùng RobustScaler
-            data_raw = [[tx.amount, tx.time_val] for tx in payload.transactions]
-            X_scaled = scaler.transform(data_raw)
+            # Scale dùng RobustScaler (2 cột)
+            X_raw = np.array([[tx.amount, tx.time_val] for tx in payload.transactions])
+            X_scaled = scaler.transform(X_raw)
             # Ghép với V features
-            v_data = [tx.v_features for tx in payload.transactions]
+            v_data = np.array([tx.v_features for tx in payload.transactions])
             data_final = np.hstack([X_scaled, v_data])
         else:
             # Fallback
@@ -187,8 +187,9 @@ async def verify_transaction(tx: Transaction):
     try:
         # Chuẩn bị dữ liệu (Standardizing logic)
         if scaler:
-            scaled_amt = float(scaler.transform([[tx.amount]])[0][0])
-            scaled_time = float(scaler.transform([[tx.time_val]])[0][0])
+            input_scaled = scaler.transform([[tx.amount, tx.time_val]])
+            scaled_amt = float(input_scaled[0][0])
+            scaled_time = float(input_scaled[0][1])
         else:
             scaled_amt = tx.amount / 100
             scaled_time = tx.time_val / 1000

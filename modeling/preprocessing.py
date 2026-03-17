@@ -131,8 +131,8 @@ print(f"[INFO] Đã lưu boxplot Amount theo Class tại '{OUTPUT_DIR}/boxplot_a
 print("\n--- Scaling Time and Amount ---")
 rob_scaler = RobustScaler()
 
-df['scaled_amount'] = rob_scaler.fit_transform(df['Amount'].values.reshape(-1,1))
-df['scaled_time'] = rob_scaler.fit_transform(df['Time'].values.reshape(-1,1))
+# Fit và transform cả 2 cột cùng lúc để tránh ghi đè thông số
+df[['scaled_amount', 'scaled_time']] = rob_scaler.fit_transform(df[['Amount', 'Time']])
 
 # Lưu scaler đã học để dùng lại trong deployment
 MODELING_DIR = os.path.join(BASE_DIR, 'modeling')
