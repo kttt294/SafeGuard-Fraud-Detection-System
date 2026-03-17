@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 import time
 import requests
 from datetime import datetime
+import io
 
 # --- 1. CONFIG & SETUP ---
 load_dotenv()
@@ -416,6 +417,11 @@ def process_bulk_cloud(df, amt_col, time_col, source="HỆ THỐNG (Bulk)"):
     fraud_indices = np.where(probs > 0.5)[0]
     fraud_count = len(fraud_indices)
     
+    # Tạo DataFrame chứa kết quả gian lận của lô này
+    fraud_df_batch = df.iloc[fraud_indices].copy()
+    if fraud_count > 0:
+        fraud_df_batch['fraud_probability'] = probs[fraud_indices]
+    
     # 3. Lưu vào DB hàng loạt nếu có gian lận
     if fraud_count > 0:
         conn = None
@@ -423,8 +429,7 @@ def process_bulk_cloud(df, amt_col, time_col, source="HỆ THỐNG (Bulk)"):
             conn = get_db_connection()
             if conn:
                 cur = conn.cursor()
-                # Tối ưu: Dùng list comprehension thay vì lặp iloc (iloc bên trong loop rất chậm)
-                # Lấy các giá trị cần thiết ra mảng trước
+                # Tối ưu: Lấy các giá trị cần thiết ra mảng trước
                 selected_rows = df.iloc[fraud_indices]
                 amounts = selected_rows[amt_col].values
                 times = selected_rows[time_col].values
@@ -444,7 +449,7 @@ def process_bulk_cloud(df, amt_col, time_col, source="HỆ THỐNG (Bulk)"):
         finally:
             if conn: release_db_connection(conn)
             
-    return fraud_count
+    return fraud_df_batch
 
 @st.cache_data
 def load_csv_data(file):
@@ -559,16 +564,60 @@ with col_right:
                         time_col = 'Time' if 'Time' in df.columns else 'scaled_time'
                         
                         batch_size = 100_000
-                        fraud_total = 0
+                        all_frauds = []
                         total_rows = len(df)
                         
                         for start_idx in range(0, total_rows, batch_size):
                             end_idx = min(start_idx + batch_size, total_rows)
                             batch_df = df.iloc[start_idx:end_idx]
                             
-                            fraud_total += process_bulk_cloud(batch_df, amt_col, time_col)
+                            fraud_batch = process_bulk_cloud(batch_df, amt_col, time_col)
+                            if not fraud_batch.empty:
+                                all_frauds.append(fraud_batch)
                         
-                        st.success(f"Hoàn tất! Đã xử lý {total_rows:,} giao dịch. Phát hiện {fraud_total} vụ gian lận.")
+                        if all_frauds:
+                            st.session_state.fraud_df_cloud = pd.concat(all_frauds, ignore_index=True)
+                            st.success(f"Hoàn tất! Đã xử lý {total_rows:,} giao dịch. Phát hiện {len(st.session_state.fraud_df_cloud)} vụ gian lận.")
+                        else:
+                            st.session_state.fraud_df_cloud = pd.DataFrame()
+                            st.info(f"Hoàn tất! Không phát hiện gian lận trong {total_rows:,} giao dịch.")
+
+                # Hiển thị nút tải xuống nếu có kết quả
+                if 'fraud_df_cloud' in st.session_state and not st.session_state.fraud_df_cloud.empty:
+                    st.write("---")
+                    st.markdown('<p style="font-weight:600; color:#1e293b;">Xuất kết quả gian lận:</p>', unsafe_allow_html=True)
+                    
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        fmt = st.selectbox("Định dạng file:", ["CSV", "Excel", "JSON"], key="fmt_cloud")
+                    
+                    with c2:
+                        st.write("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Spacer
+                        file_data = None
+                        mime_type = ""
+                        file_ext = fmt.lower()
+                        
+                        if fmt == "CSV":
+                            file_data = st.session_state.fraud_df_cloud.to_csv(index=False).encode('utf-8')
+                            mime_type = "text/csv"
+                        elif fmt == "Excel":
+                            output = io.BytesIO()
+                            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                                st.session_state.fraud_df_cloud.to_excel(writer, index=False)
+                            file_data = output.getvalue()
+                            mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            file_ext = "xlsx"
+                        elif fmt == "JSON":
+                            file_data = st.session_state.fraud_df_cloud.to_json(orient='records', indent=4).encode('utf-8')
+                            mime_type = "application/json"
+
+                        st.download_button(
+                            label=f"Tải file {fmt}",
+                            data=file_data,
+                            file_name=f"detected_frauds_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_ext}",
+                            mime=mime_type,
+                            use_container_width=True
+                        )
                 st.markdown('</div>', unsafe_allow_html=True)
 
     analysis_center_cloud()

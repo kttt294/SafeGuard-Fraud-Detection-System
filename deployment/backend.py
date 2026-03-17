@@ -148,16 +148,28 @@ async def verify_bulk(payload: BulkTransactions):
         fraud_indices = np.where(probs > 0.5)[0]
         fraud_count = len(fraud_indices)
         
+        fraud_list = []
+        
         # 4. Lưu DB hàng loạt nếu có gian lận
         if fraud_count > 0:
+            # Chuẩn bị dữ liệu trả về cho frontend
+            for idx in fraud_indices:
+                orig_tx = payload.transactions[idx]
+                fraud_list.append({
+                    "amount": orig_tx.amount,
+                    "time_val": orig_tx.time_val,
+                    "v_features": orig_tx.v_features,
+                    "fraud_probability": float(probs[idx]),
+                    "source": orig_tx.source
+                })
+
             conn = get_db_connection()
             if conn:
                 from psycopg2.extras import execute_values
                 cur = conn.cursor()
-                # Tối ưu: Dùng list comprehension để chuẩn bị data
                 insert_data = [
-                    (payload.transactions[idx].amount, payload.transactions[idx].time_val, float(probs[idx]), payload.transactions[idx].source)
-                    for idx in fraud_indices
+                    (float(orig_tx["amount"]), float(orig_tx["time_val"]), float(orig_tx["fraud_probability"]), str(orig_tx["source"]))
+                    for orig_tx in fraud_list
                 ]
                 
                 # Lưu vào bảng SYSTEM vì đây là quét file từ Dashboard
@@ -171,7 +183,8 @@ async def verify_bulk(payload: BulkTransactions):
         return {
             "status": "success",
             "processed_count": len(payload.transactions),
-            "fraud_detected": fraud_count
+            "fraud_detected": fraud_count,
+            "frauds": fraud_list
         }
     except Exception as e:
         import traceback

@@ -19,3 +19,4 @@ requests
 # --- Database & Environment ---
 psycopg2-binary
 python-dotenv
+openpyxl

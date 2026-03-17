@@ -67,7 +67,7 @@ Dự án này xây dựng một hệ thống phát hiện giao dịch gian lận
 * **Interpretability:** Sử dụng `SHAP` values để giải thích lý do mô hình dự đoán gian lận cho từng giao dịch cụ thể.
 * **Model Export:** Lưu mô hình đã huấn luyện (Pipeline hoàn chỉnh) thành file `.pkl` để sử dụng cho Web App.
 
-### 5. Ứng dụng Web (Web Application - Streamlit)
+### Ứng dụng Web (Web Application - Streamlit)
 
 * **SafeGuard Banking Dashboard:** Xây dựng giao diện Web cho phép:
   * Nhập thông số giao dịch hoặc upload CSV để kiểm tra gian lận.
@@ -113,7 +113,6 @@ Doanh nghiệp không chỉ cần một báo cáo hay một đoạn code chạy 
 * Một **Hệ thống hỗ trợ chuyên viên (Specialist Assistant)** giúp xử lý các tệp dữ liệu lớn hàng chục nghìn dòng một cách tập trung.
 
 Mục tiêu: Hệ thống **SafeGuard** được thiết kế và phát triển chính là câu trả lời cho bài toán này. Nó chuyển đổi những bộ dữ liệu số khô khan thành hành động bảo mật cụ thể, giúp doanh nghiệp chủ động ngăn chặn gian lận thay vì chỉ thụ động khắc phục hậu quả.
-
 
 ## Verification Plan
 

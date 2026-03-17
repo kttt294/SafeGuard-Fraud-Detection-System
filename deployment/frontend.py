@@ -5,6 +5,7 @@ import os
 import requests
 from datetime import datetime
 import time
+import io
 
 # --- 1. CONFIG & SETUP ---
 # --- 1. CONFIG & SETUP ---
@@ -167,6 +168,7 @@ with col_right:
                         
                         batch_size = 100_000
                         fraud_count = 0
+                        all_detected_frauds = []
                         total = len(df)
                         v_cols = [f'V{i}' for i in range(1, 28 + 1)]
                         
@@ -174,9 +176,7 @@ with col_right:
                             end_idx = min(start_idx + batch_size, total)
                             batch_df = df.iloc[start_idx:end_idx]
                             
-                            # Tối ưu: Chuyển sang dict trực tiếp từ DataFrame thay vì dùng iterrows
                             transactions = []
-                            # chuẩn bị dữ liệu mảng V
                             v_array = batch_df[v_cols].values.tolist()
                             amounts = batch_df[amt_col].values.astype(float)
                             times = batch_df[time_col].values.astype(float)
@@ -194,9 +194,56 @@ with col_right:
                                 res = requests.post(f"{API_BASE_URL}/verify-bulk", json=payload, timeout=30).json()
                                 if res.get("status") == "success":
                                     fraud_count += res.get("fraud_detected", 0)
+                                    batch_frauds = res.get("frauds", [])
+                                    if batch_frauds:
+                                        all_detected_frauds.extend(batch_frauds)
                             except Exception as e:
                                 st.error(f"Lỗi khi gửi lô {start_idx}-{end_idx}: {e}")
                         
-                        st.success(f"Hoàn tất! Đã xử lý {total:,} giao dịch thông qua API. Phát hiện {fraud_count} vụ gian lận.")
+                        if fraud_count > 0:
+                            st.session_state.fraud_df_front = pd.DataFrame(all_detected_frauds) if all_detected_frauds else pd.DataFrame()
+                            st.success(f"Hoàn tất! Đã xử lý {total:,} giao dịch. Phát hiện {fraud_count} vụ gian lận.")
+                            if not all_detected_frauds:
+                                st.warning("⚠️ Đã phát hiện gian lận nhưng không thể lấy danh sách chi tiết. Vui lòng khởi động lại Backend API.")
+                        else:
+                            st.session_state.fraud_df_front = pd.DataFrame()
+                            st.info(f"Hoàn tất! Không phát hiện gian lận trong {total:,} giao dịch.")
+
+                # Hiển thị nút tải xuống nếu có kết quả
+                if 'fraud_df_front' in st.session_state and not st.session_state.fraud_df_front.empty:
+                    st.write("---")
+                    st.markdown('<p style="font-weight:600; color:#1e293b;">Xuất kết quả gian lận:</p>', unsafe_allow_html=True)
+                    
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        fmt = st.selectbox("Định dạng file:", ["CSV", "Excel", "JSON"], key="fmt_front")
+                    
+                    with c2:
+                        st.write("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Spacer
+                        file_data = None
+                        mime_type = ""
+                        file_ext = fmt.lower()
+                        
+                        if fmt == "CSV":
+                            file_data = st.session_state.fraud_df_front.to_csv(index=False).encode('utf-8')
+                            mime_type = "text/csv"
+                        elif fmt == "Excel":
+                            output = io.BytesIO()
+                            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                                st.session_state.fraud_df_front.to_excel(writer, index=False)
+                            file_data = output.getvalue()
+                            mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            file_ext = "xlsx"
+                        elif fmt == "JSON":
+                            file_data = st.session_state.fraud_df_front.to_json(orient='records', indent=4).encode('utf-8')
+                            mime_type = "application/json"
+
+                        st.download_button(
+                            label=f"Tải file {fmt}",
+                            data=file_data,
+                            file_name=f"local_detected_frauds_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_ext}",
+                            mime=mime_type,
+                            use_container_width=True
+                        )
 
     analysis_center_frontend()
