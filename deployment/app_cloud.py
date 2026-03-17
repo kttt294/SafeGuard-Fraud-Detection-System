@@ -123,10 +123,10 @@ CSS_EMBEDDED = """
 [data-testid="stNumberInput"] {
     max-width: 160px !important;
     margin-bottom: 10px !important;
-    margin-top: -20px !important;
 }
 
-.stButton {
+/* Chỉ căn giữa nút primary, không đụng đến nút secondary (X xóa) */
+.stButton:has(> button[data-testid="stBaseButton-primary"]) {
     display: flex;
     justify-content: center;
 }
@@ -476,14 +476,16 @@ with col_right:
                 v_cols = st.columns(4)
                 for i, v_name in enumerate(selected_vs):
                     with v_cols[i % 4]:
-                        # Dùng columns thuần để tạo layout tên + nút X ổn định trên mọi môi trường
-                        h_col, b_col = st.columns([3, 1])
-                        with h_col:
-                            st.markdown(f'<div style="font-weight:600;font-size:0.9rem;color:#1e293b;padding-top:8px">{v_name}</div>', unsafe_allow_html=True)
-                        with b_col:
+                        # Dùng tên + input trực tiếp, nút X bên phải quản lý bằng CSS sắc nét
+                        label_col, del_col = st.columns([4, 1])
+                        with label_col:
+                            st.markdown(f'<p style="margin:0;padding-top:6px;font-weight:600;font-size:0.9rem;color:#1e293b">{v_name}</p>', unsafe_allow_html=True)
+                        with del_col:
+                            st.markdown('<div style="display:flex;justify-content:flex-end;padding-top:2px">', unsafe_allow_html=True)
                             if st.button("✕", key=f"del_{v_name}_cloud", type="secondary"):
                                 st.session_state.v_multi_cloud.remove(v_name)
                                 st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
                         st.number_input(v_name, value=0.0, step=None, label_visibility="collapsed", key=f"val_{v_name}_cloud")
 
             st.markdown("<br>", unsafe_allow_html=True)
