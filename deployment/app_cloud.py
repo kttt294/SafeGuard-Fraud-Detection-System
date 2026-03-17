@@ -164,13 +164,20 @@ CSS_EMBEDDED = """
     line-height: 28px;
 }
 
-/* Container nút xóa: Kéo lên ngang hàng với tên đặc trưng */
+/* Chỉ tác động lên nút X (secondary) trong bảng nhập liệu, không ảnh hưởng nút chính (primary) */
 .stButton:has(> button[data-testid="stBaseButton-secondary"]) {
     margin-top: -28px !important;
     margin-bottom: 0 !important;
     justify-content: flex-end !important;
     padding: 0 !important;
     max-width: 160px !important;
+}
+
+.center-btn {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
 }
 
 .stButton > button[data-testid="stBaseButton-secondary"] {
@@ -505,6 +512,7 @@ with col_right:
             if up:
                 df = load_csv_data(up)
                 st.dataframe(df.head(), use_container_width=True)
+                st.markdown('<div class="center-btn">', unsafe_allow_html=True)
                 if st.button("Quét toàn bộ tập tin", type="primary", key="scan_cloud"):
                     with st.spinner("Đang phân tích hàng loạt..."):
                         # Nhận diện cột
@@ -522,5 +530,6 @@ with col_right:
                             fraud_total += process_bulk_cloud(batch_df, amt_col, time_col)
                         
                         st.success(f"Hoàn tất! Đã xử lý {total_rows:,} giao dịch. Phát hiện {fraud_total} vụ gian lận.")
+                st.markdown('</div>', unsafe_allow_html=True)
 
     analysis_center_cloud()
