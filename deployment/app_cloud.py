@@ -358,13 +358,18 @@ def process_prediction(amount, time_val, v_features, source="HỆ THỐNG (Manua
     if model:
         conn = None
         try:
-            # Scale Amount và Time bằng đúng scaler đã fit trên train data (2 cột)
+            # Scale Amount và Time (Tự thích nghi với Scaler 1 cột hoặc 2 cột)
             if scaler:
-                input_scaled = scaler.transform([[amount, time_val]])
-                scaled_amt = float(input_scaled[0][0])
-                scaled_time = float(input_scaled[0][1])
+                n_feats = getattr(scaler, 'n_features_in_', 1)
+                if n_feats == 2:
+                    input_scaled = scaler.transform([[amount, time_val]])
+                    scaled_amt = float(input_scaled[0][0])
+                    scaled_time = float(input_scaled[0][1])
+                else:
+                    # Scaler cũ chỉ có 1 cột -> scale từng cái
+                    scaled_amt = float(scaler.transform([[amount]])[0][0])
+                    scaled_time = float(scaler.transform([[time_val]])[0][0])
             else:
-                # Fallback nếu không có scaler
                 scaled_amt = amount / 100
                 scaled_time = time_val / 1000
             
@@ -389,13 +394,19 @@ def process_prediction(amount, time_val, v_features, source="HỆ THỐNG (Manua
 def process_bulk_cloud(df, amt_col, time_col, source="HỆ THỐNG (Bulk)"):
     if not model: return 0
     
-    # Scale Amount và Time bằng đúng scaler (2 cột)
+    # Scale Amount và Time (Tự thích nghi)
     if scaler and amt_col in ('Amount', 'Time'):
-        X_raw = df[[amt_col, time_col]].values
-        X_scaled = scaler.transform(X_raw)
-        X = X_scaled
+        n_feats = getattr(scaler, 'n_features_in_', 1)
+        if n_feats == 2:
+            X_raw = df[[amt_col, time_col]].values
+            X = scaler.transform(X_raw)
+        else:
+            # Scaler cũ 1 cột -> ghép kết quả sau khi scale riêng lẻ
+            amt_scaled = scaler.transform(df[[amt_col]].values).flatten()
+            time_scaled = scaler.transform(df[[time_col]].values).flatten()
+            X = np.column_stack([amt_scaled, time_scaled])
     else:
-        # Nếu là cột scaled_amount/scaled_time thì dùng thẳng
+        # Nếu là cột đã scale sẵn
         X = df[[amt_col, time_col]].values
     V = df[[f'V{i}' for i in range(1, 29)]].values
     input_array = np.hstack([X, V])
