@@ -164,14 +164,7 @@ CSS_EMBEDDED = """
     line-height: 28px;
 }
 
-/* Chỉ tác động lên nút X (secondary) trong bảng nhập liệu, không ảnh hưởng nút chính (primary) */
-.stButton:has(> button[data-testid="stBaseButton-secondary"]) {
-    margin-top: -28px !important;
-    margin-bottom: 0 !important;
-    justify-content: flex-end !important;
-    padding: 0 !important;
-    max-width: 160px !important;
-}
+/* Container nút xóa - Đã xử lý bằng st.columns, không cần CSS hack */
 
 .center-btn {
     display: flex;
@@ -483,14 +476,14 @@ with col_right:
                 v_cols = st.columns(4)
                 for i, v_name in enumerate(selected_vs):
                     with v_cols[i % 4]:
-                        st.markdown(f"""
-                            <div class="v-feature-row">
-                                <span class="feature-name">{v_name}</span>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        if st.button("✕", key=f"del_{v_name}_cloud", type="secondary"):
-                            st.session_state.v_multi_cloud.remove(v_name)
-                            st.rerun()
+                        # Dùng columns thuần để tạo layout tên + nút X ổn định trên mọi môi trường
+                        h_col, b_col = st.columns([3, 1])
+                        with h_col:
+                            st.markdown(f'<div style="font-weight:600;font-size:0.9rem;color:#1e293b;padding-top:8px">{v_name}</div>', unsafe_allow_html=True)
+                        with b_col:
+                            if st.button("✕", key=f"del_{v_name}_cloud", type="secondary"):
+                                st.session_state.v_multi_cloud.remove(v_name)
+                                st.rerun()
                         st.number_input(v_name, value=0.0, step=None, label_visibility="collapsed", key=f"val_{v_name}_cloud")
 
             st.markdown("<br>", unsafe_allow_html=True)
