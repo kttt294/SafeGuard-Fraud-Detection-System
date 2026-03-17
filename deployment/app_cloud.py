@@ -404,7 +404,7 @@ def process_bulk_cloud(df, amt_col, time_col, source="HỆ THỐNG (Bulk)"):
 def load_csv_data(file):
     return pd.read_csv(file)
 
-# --- 3. UI LAYOUT ---
+# --- 3. UI ---
 
 # Header Cố định
 st.markdown("""
