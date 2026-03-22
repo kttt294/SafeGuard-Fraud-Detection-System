@@ -18,7 +18,7 @@ from datetime import datetime
 import io
 
 # --- 1. CONFIG & SETUP ---
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 st.set_page_config(page_title="SafeGuard Banking", layout="wide")
 
 # NHÚNG TOÀN BỘ CSS

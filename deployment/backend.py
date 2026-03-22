@@ -14,7 +14,7 @@ from datetime import datetime
 import warnings
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 
 # --- 0. KHỞI TẠO CƠ SỞ DỮ LIỆU ---
 @asynccontextmanager
