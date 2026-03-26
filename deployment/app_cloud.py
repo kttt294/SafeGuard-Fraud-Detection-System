@@ -132,15 +132,22 @@ CSS_EMBEDDED = """
     justify-content: center;
 }
 
-.stButton > button[data-testid="stBaseButton-primary"] {
+.stButton > button {
     width: 100% !important; 
-    background-color: #38bdf8 !important;
-    color: white !important; border-radius: 6px !important;
-    border: none !important; font-weight: 600 !important;
-    font-size: 0.6rem !important; /* Siêu nhỏ */
-    height: 24px !important; /* Hạ thêm độ cao */
+    background-color: #f1f5f9 !important; /* Xám nhạt */
+    color: #475569 !important; /* Chữ xám đậm */
+    border-radius: 6px !important;
+    border: 1px solid #e2e8f0 !important;
+    font-weight: 600 !important;
+    font-size: 0.55rem !important; /* Thu nhỏ cỡ chữ thêm chút nữa */
+    height: 22px !important; /* Hạ thêm độ cao nhẹ */
     line-height: 1 !important;
     transition: all 0.2s ease !important;
+}
+
+.stButton > button:hover {
+    background-color: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
 }
 
 /* Thu nhỏ padding của khung viền Alert Card */
