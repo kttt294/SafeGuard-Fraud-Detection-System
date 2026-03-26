@@ -137,8 +137,15 @@ CSS_EMBEDDED = """
     background-color: #38bdf8 !important;
     color: white !important; border-radius: 6px !important;
     border: none !important; font-weight: 600 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.8rem !important;
+    height: 28px !important;
+    line-height: 1 !important;
     transition: all 0.2s ease !important;
+}
+
+/* Thu nhỏ padding của khung viền Alert Card */
+div[data-testid="stVerticalBlockBorderWrapper"] > div {
+    padding: 0.5rem 0.8rem !important;
 }
 
 [data-testid="stFileUploader"] {
@@ -484,7 +491,7 @@ def load_csv_data(file):
 
 st.markdown("""
 <div class="custom-header">
-    <div class="header-branding">SafeGuard - Credit Fraud Detection</div>
+    <div class="header-branding">SafeGuard Banking | Monitoring Dashboard</div>
     <div class="header-right">
         <div class="header-icons">
             <div class="icon-wrapper" style="margin-right: 15px;">
@@ -535,12 +542,11 @@ with col_left:
                                 confirm_fraud_db(log_id, True)
                                 st.rerun()
 
-                    # Body
+                    # Body (Compact)
                     st.markdown(f"""
-                        <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-top: 4px;">Giao dịch gian lận!</div>
-                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
-                            Số tiền: <b>€{amt:,.2f}</b> • Prob: <b>{prob_str}</b><br>
-                            🕒 {time_str}
+                        <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b; margin: 2px 0 0 0;">Giao dịch gian lận!</div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin: 0;">
+                            Số tiền: <b>€{amt:,.2f}</b> • Prob: <b>{prob_str}</b> | 🕒 {time_str}
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -558,26 +564,23 @@ with col_right:
         tab1, tab2 = st.tabs(["Kiểm Tra Thủ Công", "Tải Lên File"])
         
         with tab1:
-            st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-            c_base1, b_base2 = st.columns([1, 1.2])
-            with c_base1:
-                st.markdown('<p style="margin:0 0 4px 0;font-weight:600;font-size:0.9rem;color:#1e293b">Số tiền (Amount)</p>', unsafe_allow_html=True)
+            st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+            # Chia làm 4 cột trên cùng 1 hàng
+            now = datetime.now()
+            ca, ch, cm, cs = st.columns([1.8, 1, 1, 1])
+            
+            with ca:
+                st.markdown('<p style="margin:0 0 4px 0;font-weight:600;font-size:0.85rem;color:#1e293b">Số tiền (Amount)</p>', unsafe_allow_html=True)
                 st.number_input("Số tiền", value=100.0, step=None, label_visibility="collapsed", key="amt_cloud")
-
-            # FIX: Bỏ cột thứ 4 trống, dùng st.columns(3) chia đều — tránh 3 ô bị bóp
-            with b_base2:
-                st.markdown('<p style="margin:0 0 4px 0;font-weight:600;font-size:0.9rem;color:#1e293b">Giờ giao dịch (H:M:S)</p>', unsafe_allow_html=True)
-                now = datetime.now()
-                tc1, tc2, tc3 = st.columns(3)
-                with tc1:
-                    st.markdown('<p class="time-label">Giờ</p>', unsafe_allow_html=True)
-                    h = st.number_input("H", min_value=0, max_value=23, value=now.hour, key="h_cloud", label_visibility="collapsed")
-                with tc2:
-                    st.markdown('<p class="time-label">Phút</p>', unsafe_allow_html=True)
-                    m = st.number_input("M", min_value=0, max_value=59, value=now.minute, key="m_cloud", label_visibility="collapsed")
-                with tc3:
-                    st.markdown('<p class="time-label">Giây</p>', unsafe_allow_html=True)
-                    s = st.number_input("S", min_value=0, max_value=59, value=now.second, key="s_cloud", label_visibility="collapsed")
+            with ch:
+                st.markdown('<p class="time-label">Giờ (H)</p>', unsafe_allow_html=True)
+                h = st.number_input("H", min_value=0, max_value=23, value=now.hour, key="h_cloud", label_visibility="collapsed")
+            with cm:
+                st.markdown('<p class="time-label">Phút (M)</p>', unsafe_allow_html=True)
+                m = st.number_input("M", min_value=0, max_value=59, value=now.minute, key="m_cloud", label_visibility="collapsed")
+            with cs:
+                st.markdown('<p class="time-label">Giây (S)</p>', unsafe_allow_html=True)
+                s = st.number_input("S", min_value=0, max_value=59, value=now.second, key="s_cloud", label_visibility="collapsed")
             
             selected_vs = st.multiselect(
                 "Chọn thêm đặc trưng để nhập dữ liệu:",

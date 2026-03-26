@@ -143,7 +143,6 @@
 [data-testid="stNumberInput"] {
     max-width: 100% !important; /* Mặc định cho Amount và các ô khác */
     margin-bottom: 10px !important;
-    margin-top: -20px !important;
 }
 
 /* Thu nhỏ riêng 3 ô nhập giờ phút giây */

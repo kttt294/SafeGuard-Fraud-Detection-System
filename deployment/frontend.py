@@ -85,14 +85,14 @@ with col_left:
                         # Container bao quanh mỗi Alert
                         with st.container(border=True):
                             # Header: Source + Nút Xác nhận
-                            h1, h2 = st.columns([3, 1])
+                            h1, h2 = st.columns([2.2, 1.4])
                             with h1:
                                 st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{alert.get("source", "API")}</span>', unsafe_allow_html=True)
                             with h2:
                                 if confirmed is True:
                                     st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                                 else:
-                                    if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
+                                    if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True, type="primary"):
                                         try:
                                             requests.put(f"{API_BASE_URL}/confirm-fraud/{log_id}", json={"is_fraud": True}, timeout=3)
                                             st.rerun()
