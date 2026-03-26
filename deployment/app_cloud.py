@@ -538,7 +538,7 @@ with col_left:
                         if confirmed is True:
                             st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.5rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                         else:
-                            if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
+                            if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True, type="primary"):
                                 confirm_fraud_db(log_id, True)
                                 st.rerun()
 

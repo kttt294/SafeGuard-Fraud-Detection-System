@@ -17,6 +17,25 @@ if os.path.exists(css_path):
     with open(css_path, encoding='utf-8') as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
+# Thêm Inline CSS để cưỡng ép giao diện nút bấm giống bản Cloud
+st.markdown("""
+<style>
+.stButton > button[data-testid="stBaseButton-primary"] {
+    width: 100% !important; 
+    background-color: #38bdf8 !important;
+    color: white !important; border-radius: 6px !important;
+    border: none !important; font-weight: 600 !important;
+    font-size: 0.6rem !important;
+    height: 24px !important;
+    line-height: 1 !important;
+    transition: all 0.2s ease !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] > div {
+    padding: 0.5rem 0.8rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 API_BASE_URL = "http://localhost:8000"
 
 @st.cache_data
