@@ -153,10 +153,11 @@ CSS_EMBEDDED = """
 /* Nút chính - Phân tích (Blue, To rõ ràng như cũ) */
 .stButton button[kind="primary"] {
     width: 100% !important; 
+    max-width: none !important; /* Đảm bảo không bị giới hạn nút to */
     border-radius: 8px !important;
     font-weight: 600 !important;
-    font-size: 0.85rem !important; /* To như bình thường */
-    height: 38px !important; /* Chiều cao chuẩn */
+    font-size: 0.85rem !important;
+    height: 38px !important;
     background-color: #38bdf8 !important;
     color: white !important;
     border: none !important;
@@ -440,17 +441,24 @@ def process_prediction(amount, transaction_time, v_features, source="HỆ THỐN
             decision = "BLOCK" if prob > 0.5 else "APPROVE"
 
             if decision == "BLOCK":
-                conn = get_db_connection()
-                if conn:
-                    cur = conn.cursor()
-                    cur.execute(
-                        "INSERT INTO system_fraud_logs (amount, time_val, v_features, fraud_probability, source) VALUES (%s, %s, %s, %s, %s)",
-                        (amount, time_val, json.dumps(v_features), prob, source)
-                    )
-                    conn.commit()
-                    cur.close()
+                # Bảo vệ UI: Chỉ ghi log nếu DB phản hồi nhanh, tránh treo nút bấm
+                try:
+                    conn = get_db_connection()
+                    if conn:
+                        cur = conn.cursor()
+                        # Thiết lập timeout cho session để không đợi quá lâu
+                        cur.execute("SET statement_timeout TO 2000") # 2s
+                        cur.execute(
+                            "INSERT INTO system_fraud_logs (amount, time_val, v_features, fraud_probability, source) VALUES (%s, %s, %s, %s, %s)",
+                            (amount, time_val, json.dumps(v_features), prob, source)
+                        )
+                        conn.commit()
+                        cur.close()
+                except:
+                    pass # Bỏ qua ghi log nếu DB lỗi/chậm để hiện kết quả nhanh
             return {"decision": decision, "prob": f"{prob:.2%}"}
-        except: pass
+        except Exception as e:
+            print(f"Error in prediction: {e}")
         finally:
             if conn: release_db_connection(conn)
     return None
@@ -560,7 +568,7 @@ with col_left:
                         st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{src}</span>', unsafe_allow_html=True)
                     with h2:
                         if confirmed is True:
-                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.75rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
+                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.75rem;font-weight:400;padding:2px 4px;border-radius:4px;display:block;text-align:center;">ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                         else:
                             if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                 confirm_fraud_db(log_id, True)
@@ -622,18 +630,24 @@ with col_right:
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Bắt đầu phân tích", type="primary", key="btn_cloud"):
-                with st.spinner("Đang phân tích..."):
+                res = None
+                with st.spinner("Hệ thống đang kiểm tra..."):
                     v_feats = [0.0]*28
                     for v_name in selected_vs:
                         v_idx = int(v_name[1:])
                         v_feats[v_idx-1] = st.session_state[f"val_{v_name}_cloud"]
                     tx_time = f"{st.session_state.h_cloud:02d}:{st.session_state.m_cloud:02d}:{st.session_state.s_cloud:02d}"
-                    res = process_prediction(st.session_state.amt_cloud, tx_time, v_feats, source="HỆ THỐNG (Manual)")
-                    if res:
-                        if "BLOCK" in res['decision']:
-                            st.error(f"Kết quả: GIAN LẬN ({res['prob']} gian lận)")
-                        else:
-                            st.success(f"Kết quả: HỢP LỆ ({res['prob']} gian lận)")
+                    try:
+                        res = process_prediction(st.session_state.amt_cloud, tx_time, v_feats, source="HỆ THỐNG (Manual)")
+                    except Exception as e:
+                        st.error(f"Lỗi phân tích: {e}")
+                
+                # Hiển thị kết quả ngoài Spinner
+                if res:
+                    if "BLOCK" in res['decision']:
+                        st.error(f"⚠️ CẢNH BÁO: GIAN LẬN ({res['prob']} xác suất)")
+                    else:
+                        st.success(f"✅ HỢP LỆ ({res['prob']} xác suất gian lận)")
 
         with tab2:
             up = st.file_uploader("Tải lên file giao dịch (.csv)", type="csv", key="file_cloud", label_visibility="collapsed")

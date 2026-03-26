@@ -128,7 +128,7 @@ with col_left:
 
                         # Badge trạng thái
                         if confirmed is True:
-                            badge = '<span style="background:#dcfce7;color:#16a34a;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">✓ ĐÃ XÁC NHẬN</span>'
+                            badge = '<span style="background:#dcfce7;color:#16a34a;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">ĐÃ XÁC NHẬN</span>'
                         else:
                             badge = '<span style="background:#fef9c3;color:#ca8a04;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">⏳ CHờ XÁC NHẬN</span>'
 
@@ -140,7 +140,7 @@ with col_left:
                                 st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{alert.get("source", "API")}</span>', unsafe_allow_html=True)
                             with h2:
                                 if confirmed is True:
-                                    st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.75rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
+                                    st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.75rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                                 else:
                                     if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                         try:

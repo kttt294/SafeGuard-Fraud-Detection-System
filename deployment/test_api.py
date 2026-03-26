@@ -2,7 +2,7 @@ import requests
 import json
 
 def test_api():
-    url = "http://localhost:8000/verify"
+    url = "http://127.0.0.1:8000/verify"
     
     # Giả lập một giao dịch bị BLOCK
     payload = {
