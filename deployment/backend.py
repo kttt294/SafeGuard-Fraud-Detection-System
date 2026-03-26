@@ -29,8 +29,10 @@ async def lifespan(app: FastAPI):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 amount FLOAT,
                 time_val FLOAT,
+                v_features JSONB,
                 fraud_probability FLOAT,
-                source TEXT DEFAULT 'API (User App)'
+                source TEXT DEFAULT 'API (User App)',
+                confirmed BOOLEAN DEFAULT FALSE
             )
         """)
         # 2. Bảng cho Dashboard (Phân tích nội bộ)
@@ -40,10 +42,22 @@ async def lifespan(app: FastAPI):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 amount FLOAT,
                 time_val FLOAT,
+                v_features JSONB,
                 fraud_probability FLOAT,
-                source TEXT DEFAULT 'Dashboard System'
+                source TEXT DEFAULT 'Dashboard System',
+                confirmed BOOLEAN DEFAULT FALSE
             )
         """)
+        
+        # Để an toàn cho DB cũ, thêm cột nếu thiếu
+        try:
+            cur.execute("ALTER TABLE api_fraud_logs ADD COLUMN IF NOT EXISTS v_features JSONB;")
+            cur.execute("ALTER TABLE api_fraud_logs ADD COLUMN IF NOT EXISTS confirmed BOOLEAN DEFAULT FALSE;")
+            cur.execute("ALTER TABLE system_fraud_logs ADD COLUMN IF NOT EXISTS v_features JSONB;")
+            cur.execute("ALTER TABLE system_fraud_logs ADD COLUMN IF NOT EXISTS confirmed BOOLEAN DEFAULT FALSE;")
+        except Exception:
+            pass # Bỏ qua nếu DB không hỗ trợ cú pháp này hoặc lỗi
+
         conn.commit()
         cur.close()
         conn.close()
@@ -94,9 +108,25 @@ def get_db_connection():
 
 class Transaction(BaseModel):
     amount: float
-    time_val: float
+    transaction_time: str | None = None  # "HH:MM:SS" hoặc None (tự động lấy giờ server)
     v_features: list[float]
     source: str = "API (User App)"
+
+def resolve_time_val(transaction_time: str | None) -> float:
+    """Quy đổi giờ giao dịch sang giây trong ngày (0 -> 86400).
+    - Nếu nhân viên cung cấp giờ (HH:MM:SS): dùng giờ đó.
+    - Nếu là API tự động (None): dùng giờ server tại thời điểm nhận request.
+    Đảm bảo time_val luôn nằm trong [0, 86400], đồng bộ hệ quy chiếu với model.
+    """
+    if transaction_time:
+        try:
+            parts = transaction_time.strip().split(":")
+            h, m, s = int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0
+            return float(h * 3600 + m * 60 + s)
+        except Exception:
+            pass  # Nếu parse lỗi, fallback về giờ server
+    now = datetime.now()
+    return float(now.hour * 3600 + now.minute * 60 + now.second)
 
 class BulkTransactions(BaseModel):
     transactions: list[Transaction]
@@ -112,13 +142,31 @@ def get_alerts(limit: int = 10):
     if not conn: return {"error": "DB_CONNECTION_FAILED"}
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        # Chỉ lấy từ bảng API thực tế
-        cur.execute("SELECT amount, fraud_probability, created_at, source FROM api_fraud_logs ORDER BY created_at DESC LIMIT %s", (limit,))
+        # Lấy thông tin bao gồm cả id và confirmed
+        cur.execute("SELECT id, amount, fraud_probability, created_at, source, confirmed FROM api_fraud_logs ORDER BY created_at DESC LIMIT %s", (limit,))
         rows = cur.fetchall()
         cur.close(); conn.close()
         return {"status": "success", "data": rows}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+class ConfirmPayload(BaseModel):
+    is_fraud: bool
+
+@app.put("/confirm-fraud/{log_id}")
+def confirm_fraud(log_id: int, payload: ConfirmPayload, is_system: bool = False):
+    """API để Admin/người trực hệ thống xác nhận gian lận là thật hay giả."""
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="DB_CONNECTION_FAILED")
+    try:
+        cur = conn.cursor()
+        target_table = "system_fraud_logs" if is_system else "api_fraud_logs"
+        cur.execute(f"UPDATE {target_table} SET confirmed = %s WHERE id = %s", (payload.is_fraud, log_id))
+        conn.commit()
+        cur.close(); conn.close()
+        return {"status": "success", "confirmed": payload.is_fraud, "id": log_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/verify-bulk")
 async def verify_bulk(payload: BulkTransactions):
@@ -168,13 +216,13 @@ async def verify_bulk(payload: BulkTransactions):
                 from psycopg2.extras import execute_values
                 cur = conn.cursor()
                 insert_data = [
-                    (float(orig_tx["amount"]), float(orig_tx["time_val"]), float(orig_tx["fraud_probability"]), str(orig_tx["source"]))
+                    (float(orig_tx["amount"]), float(orig_tx["time_val"]), json.dumps(orig_tx["v_features"]), float(orig_tx["fraud_probability"]), str(orig_tx["source"]))
                     for orig_tx in fraud_list
                 ]
                 
-                # Lưu vào bảng SYSTEM vì đây là quét file từ Dashboard
+                # Lưu vào bảng SYSTEM kèm theo JSON v_features
                 execute_values(cur, 
-                    "INSERT INTO system_fraud_logs (amount, time_val, fraud_probability, source) VALUES %s", 
+                    "INSERT INTO system_fraud_logs (amount, time_val, v_features, fraud_probability, source) VALUES %s", 
                     insert_data)
                 conn.commit()
                 cur.close(); conn.close()
@@ -198,14 +246,17 @@ async def verify_transaction(tx: Transaction):
         raise HTTPException(status_code=500, detail="Mô hình AI chưa sẵn sàng.")
     
     try:
-        # Chuẩn bị dữ liệu (Standardizing logic)
+        # Bước 1: Quy đổi giờ giao dịch -> giây trong ngày (0->86400)
+        time_val = resolve_time_val(tx.transaction_time)
+
+        # Bước 2: Scale Amount và Time
         if scaler:
-            input_scaled = scaler.transform([[tx.amount, tx.time_val]])
+            input_scaled = scaler.transform([[tx.amount, time_val]])
             scaled_amt = float(input_scaled[0][0])
             scaled_time = float(input_scaled[0][1])
         else:
             scaled_amt = tx.amount / 100
-            scaled_time = tx.time_val / 1000
+            scaled_time = time_val / 86400
             
         input_data = [scaled_amt, scaled_time] + tx.v_features
         input_df = pd.DataFrame([input_data], columns=FEATURE_COLUMNS)
@@ -223,8 +274,8 @@ async def verify_transaction(tx: Transaction):
                 
                 cur = conn.cursor()
                 cur.execute(
-                    f"INSERT INTO {target_table} (amount, time_val, fraud_probability, source) VALUES (%s, %s, %s, %s)",
-                    (tx.amount, tx.time_val, prob, tx.source)
+                    f"INSERT INTO {target_table} (amount, time_val, v_features, fraud_probability, source) VALUES (%s, %s, %s, %s, %s)",
+                    (tx.amount, time_val, json.dumps(tx.v_features), prob, tx.source)
                 )
                 conn.commit()
                 cur.close(); conn.close()

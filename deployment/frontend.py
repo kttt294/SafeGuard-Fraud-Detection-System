@@ -62,12 +62,13 @@ with col_left:
             response = requests.get(f"{API_BASE_URL}/alerts?limit=8", timeout=2)
             if response.status_code == 200:
                 api_alerts = response.json().get('data', [])
-                
+
                 if not api_alerts:
                     st.info("Chưa có cảnh báo nào từ API...")
                 else:
                     for alert in api_alerts:
-                        # Định dạng thời gian từ chuỗi ISO
+                        log_id = alert.get('id')
+                        confirmed = alert.get('confirmed')
                         ts_str = alert.get('created_at', '')
                         try:
                             dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
@@ -75,9 +76,15 @@ with col_left:
                         except:
                             time_display = ts_str
 
+                        # Badge trạng thái
+                        if confirmed is True:
+                            badge = '<span style="background:#dcfce7;color:#16a34a;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">✓ ĐÃ XÁC NHẬN</span>'
+                        else:
+                            badge = '<span style="background:#fef9c3;color:#ca8a04;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">⏳ CHờ XÁC NHẬN</span>'
+
                         st.markdown(f"""
                         <div class="alert-card">
-                            <div class="alert-source">{alert.get('source', 'API')}</div>
+                            <div class="alert-source">{alert.get('source', 'API')} &nbsp;{badge}</div>
                             <div style="font-size:0.85rem; font-weight:600;">Giao dịch gian lận!</div>
                             <div class="alert-meta">
                                 Số tiền: <b>€{alert.get('amount', 0):,.2f}</b> • Prob: <b>{alert.get('fraud_probability', 0):.1%}</b>
@@ -85,6 +92,25 @@ with col_left:
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
+
+                        if confirmed is not True:
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if st.button("✅ Xác nhận Gian lận", key=f"confirm_{log_id}", use_container_width=True):
+                                    try:
+                                        requests.put(f"{API_BASE_URL}/confirm-fraud/{log_id}", json={"is_fraud": True}, timeout=3)
+                                        st.success("Đã xác nhận!")
+                                        st.rerun()
+                                    except:
+                                        st.error("Không thể kết nối!")
+                            with c2:
+                                if st.button("❌ Báo động giả", key=f"reject_{log_id}", use_container_width=True):
+                                    try:
+                                        requests.put(f"{API_BASE_URL}/confirm-fraud/{log_id}", json={"is_fraud": False}, timeout=3)
+                                        st.info("Đã đánh dấu báo động giả!")
+                                        st.rerun()
+                                    except:
+                                        st.error("Không thể kết nối!")
         except:
             st.warning("Đang kết nối tới Live API...")
         st.write("---")
@@ -105,8 +131,15 @@ with col_right:
         with tab1:
             st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
             c_base1, c_base2 = st.columns(2)
-            with c_base1: st.number_input("Số tiền", value=100.0, step=None, key="amt_front")
-            with c_base2: st.number_input("Thời gian", value=1000.0, step=None, key="time_front")
+            with c_base1:
+                st.number_input("Số tiền (Amount)", value=100.0, step=None, key="amt_front")
+            with c_base2:
+                st.markdown('<p style="margin:0 0 4px 0;font-weight:600;font-size:0.9rem;color:#1e293b">Giờ giao dịch (H:M:S)</p>', unsafe_allow_html=True)
+                tc1, tc2, tc3 = st.columns(3)
+                now = datetime.now()
+                with tc1: h = st.number_input("H", min_value=0, max_value=23, value=now.hour, key="h_front", label_visibility="collapsed")
+                with tc2: m = st.number_input("M", min_value=0, max_value=59, value=now.minute, key="m_front", label_visibility="collapsed")
+                with tc3: s = st.number_input("S", min_value=0, max_value=59, value=now.second, key="s_front", label_visibility="collapsed")
             
             selected_vs = st.multiselect(
                 "Chọn thêm đặc trưng để nhập dữ liệu:",
@@ -135,9 +168,10 @@ with col_right:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Bắt đầu phân tích", type="primary", key="btn_front"):
                 with st.spinner("Đang phân tích..."):
+                    tx_time = f"{st.session_state.h_front:02d}:{st.session_state.m_front:02d}:{st.session_state.s_front:02d}"
                     payload = {
                         "amount": st.session_state.amt_front,
-                        "time_val": st.session_state.time_front,
+                        "transaction_time": tx_time,
                         "v_features": [0.0]*28,
                         "source": "Phân tích Thủ công"
                     }

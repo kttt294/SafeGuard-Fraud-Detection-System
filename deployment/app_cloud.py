@@ -13,6 +13,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 import time
+import json
 import requests
 from datetime import datetime
 import io
@@ -32,7 +33,7 @@ CSS_EMBEDDED = """
 }
 
 .block-container {
-    padding: 60px 40px 20px 40px !important; /* Giảm padding top để kéo body lên */
+    padding: 60px 40px 20px 40px !important;
     max-width: 1400px !important;
     margin: 0 auto !important;
 }
@@ -122,11 +123,10 @@ CSS_EMBEDDED = """
 .alert-meta { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
 
 [data-testid="stNumberInput"] {
-    max-width: 160px !important;
+    max-width: 100% !important;
     margin-bottom: 10px !important;
 }
 
-/* Chỉ căn giữa nút primary, không đụng đến nút secondary (X xóa) */
 .stButton:has(> button[data-testid="stBaseButton-primary"]) {
     display: flex;
     justify-content: center;
@@ -140,7 +140,6 @@ CSS_EMBEDDED = """
     transition: all 0.2s ease !important;
 }
 
-/* Thu nhỏ và căn giữa vùng tải file */
 [data-testid="stFileUploader"] {
     width: 70% !important;
     margin: 0 auto !important;
@@ -164,8 +163,6 @@ CSS_EMBEDDED = """
     color: #1e293b;
     line-height: 28px;
 }
-
-/* Container nút xóa - Đã xử lý bằng st.columns, không cần CSS hack */
 
 .center-btn {
     display: flex;
@@ -202,6 +199,13 @@ span[data-baseweb="tag"], button[aria-label="Clear all"] {
 div[data-testid="stNumberInput"] button {
     display: none !important;
 }
+
+/* Custom style for time inputs in columns */
+.time-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 2px;
+}
 </style>
 """
 st.markdown(CSS_EMBEDDED, unsafe_allow_html=True)
@@ -216,10 +220,6 @@ def load_model():
     
     try:
         if not os.path.exists(model_path):
-            if not model_url:
-                st.error("Chưa cấu hình MODEL_URL trong Secrets! Không thể tải mô hình AI.")
-                return None
-            
             os.makedirs('modeling', exist_ok=True)
             with st.spinner("Đang tải mô hình AI từ GitHub Release (chỉ thực hiện lần đầu)..."):
                 response = requests.get(model_url, stream=True)
@@ -285,11 +285,9 @@ def get_db_pool():
             "sslmode": ssl_mode
         }
         
-        # Nếu có file certificate thì mới dùng sslrootcert
         if os.path.exists(ca_path) and ssl_mode == "require":
             params["sslrootcert"] = ca_path
         elif ssl_mode == "require":
-            # Nếu yêu cầu require nhưng không tìm thấy file CA, hạ cấp xuống allow để tránh lỗi treo app
             params["sslmode"] = "allow"
 
         return pool.SimpleConnectionPool(1, 20, **params)
@@ -301,26 +299,28 @@ def init_db_cloud():
     try:
         conn = get_db_pool().getconn()
         cur = conn.cursor()
-        # 1. Bảng API
         cur.execute("""
             CREATE TABLE IF NOT EXISTS api_fraud_logs (
                 id SERIAL PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 amount FLOAT,
                 time_val FLOAT,
+                v_features JSONB,
                 fraud_probability FLOAT,
-                source TEXT DEFAULT 'API (User App)'
+                source TEXT DEFAULT 'API (User App)',
+                confirmed BOOLEAN
             )
         """)
-        # 2. Bảng System
         cur.execute("""
             CREATE TABLE IF NOT EXISTS system_fraud_logs (
                 id SERIAL PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 amount FLOAT,
                 time_val FLOAT,
+                v_features JSONB,
                 fraud_probability FLOAT,
-                source TEXT DEFAULT 'Dashboard System'
+                source TEXT DEFAULT 'Dashboard System',
+                confirmed BOOLEAN
             )
         """)
         conn.commit()
@@ -345,8 +345,7 @@ def get_api_alerts():
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
-            # Chỉ lấy log từ bảng API (Giao dịch thực tế)
-            cur.execute("SELECT amount, fraud_probability, created_at, source FROM api_fraud_logs ORDER BY created_at DESC LIMIT 8")
+            cur.execute("SELECT id, amount, fraud_probability, created_at, source, confirmed FROM api_fraud_logs ORDER BY created_at DESC LIMIT 8")
             rows = cur.fetchall()
             cur.close()
             return rows
@@ -355,11 +354,35 @@ def get_api_alerts():
         if conn: release_db_connection(conn)
     return []
 
-def process_prediction(amount, time_val, v_features, source="HỆ THỐNG (Manual)"):
+def confirm_fraud_db(log_id: int, is_fraud: bool, table: str = "api_fraud_logs"):
+    conn = None
+    try:
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute(f"UPDATE {table} SET confirmed = %s WHERE id = %s", (is_fraud, log_id))
+            conn.commit()
+            cur.close()
+    except: pass
+    finally:
+        if conn: release_db_connection(conn)
+
+def process_prediction(amount, transaction_time, v_features, source="HỆ THỐNG (Manual)"):
     if model:
         conn = None
         try:
-            # Scale Amount và Time (Tự thích nghi với Scaler 1 cột hoặc 2 cột)
+            if transaction_time:
+                try:
+                    parts = transaction_time.strip().split(":")
+                    h, m, s = int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0
+                    time_val = float(h * 3600 + m * 60 + s)
+                except Exception:
+                    now = datetime.now()
+                    time_val = float(now.hour * 3600 + now.minute * 60 + now.second)
+            else:
+                now = datetime.now()
+                time_val = float(now.hour * 3600 + now.minute * 60 + now.second)
+
             if scaler:
                 n_feats = getattr(scaler, 'n_features_in_', 1)
                 if n_feats == 2:
@@ -367,23 +390,25 @@ def process_prediction(amount, time_val, v_features, source="HỆ THỐNG (Manua
                     scaled_amt = float(input_scaled[0][0])
                     scaled_time = float(input_scaled[0][1])
                 else:
-                    # Scaler cũ chỉ có 1 cột -> scale từng cái
                     scaled_amt = float(scaler.transform([[amount]])[0][0])
                     scaled_time = float(scaler.transform([[time_val]])[0][0])
             else:
                 scaled_amt = amount / 100
-                scaled_time = time_val / 1000
-            
+                scaled_time = time_val / 86400
+
             input_data = [scaled_amt, scaled_time] + v_features
             features_df = pd.DataFrame([input_data], columns=FEATURE_COLUMNS)
             prob = model.predict_proba(features_df)[0][1]
             decision = "BLOCK" if prob > 0.5 else "APPROVE"
-            
+
             if decision == "BLOCK":
                 conn = get_db_connection()
                 if conn:
                     cur = conn.cursor()
-                    cur.execute("INSERT INTO system_fraud_logs (amount, time_val, fraud_probability, source) VALUES (%s, %s, %s, %s)", (amount, time_val, prob, source))
+                    cur.execute(
+                        "INSERT INTO system_fraud_logs (amount, time_val, v_features, fraud_probability, source) VALUES (%s, %s, %s, %s, %s)",
+                        (amount, time_val, json.dumps(v_features), prob, source)
+                    )
                     conn.commit()
                     cur.close()
             return {"decision": decision, "prob": f"{prob:.2%}"}
@@ -394,54 +419,47 @@ def process_prediction(amount, time_val, v_features, source="HỆ THỐNG (Manua
 
 def process_bulk_cloud(df, amt_col, time_col, source="HỆ THỐNG (Bulk)"):
     if not model: return 0
-    
-    # Scale Amount và Time (Tự thích nghi)
     if scaler and amt_col in ('Amount', 'Time'):
         n_feats = getattr(scaler, 'n_features_in_', 1)
         if n_feats == 2:
             X_raw = df[[amt_col, time_col]].values
             X = scaler.transform(X_raw)
         else:
-            # Scaler cũ 1 cột -> ghép kết quả sau khi scale riêng lẻ
             amt_scaled = scaler.transform(df[[amt_col]].values).flatten()
             time_scaled = scaler.transform(df[[time_col]].values).flatten()
             X = np.column_stack([amt_scaled, time_scaled])
     else:
-        # Nếu là cột đã scale sẵn
         X = df[[amt_col, time_col]].values
     V = df[[f'V{i}' for i in range(1, 29)]].values
     input_array = np.hstack([X, V])
     
-    # 2. AI Dự đoán
     probs = model.predict_proba(input_array)[:, 1]
     fraud_indices = np.where(probs > 0.5)[0]
     fraud_count = len(fraud_indices)
     
-    # Tạo DataFrame chứa kết quả gian lận của lô này
     fraud_df_batch = df.iloc[fraud_indices].copy()
     if fraud_count > 0:
         fraud_df_batch['fraud_probability'] = probs[fraud_indices]
     
-    # 3. Lưu vào DB hàng loạt nếu có gian lận
     if fraud_count > 0:
         conn = None
         try:
             conn = get_db_connection()
             if conn:
                 cur = conn.cursor()
-                # Tối ưu: Lấy các giá trị cần thiết ra mảng trước
                 selected_rows = df.iloc[fraud_indices]
                 amounts = selected_rows[amt_col].values
                 times = selected_rows[time_col].values
                 fraud_probs = probs[fraud_indices]
+                v_feats_list = selected_rows[[f'V{i}' for i in range(1, 29)]].values.tolist()
                 
                 insert_data = [
-                    (float(amounts[i]), float(times[i]), float(fraud_probs[i]), source)
+                    (float(amounts[i]), float(times[i]), json.dumps(v_feats_list[i]), float(fraud_probs[i]), source)
                     for i in range(len(fraud_indices))
                 ]
                 
                 execute_values(cur, 
-                    "INSERT INTO system_fraud_logs (amount, time_val, fraud_probability, source) VALUES %s", 
+                    "INSERT INTO system_fraud_logs (amount, time_val, v_features, fraud_probability, source) VALUES %s", 
                     insert_data)
                 conn.commit()
                 cur.close()
@@ -457,7 +475,6 @@ def load_csv_data(file):
 
 # --- 3. UI ---
 
-# Header Cố định
 st.markdown("""
 <div class="custom-header">
     <div class="header-branding">SafeGuard - Credit Fraud Detection</div>
@@ -483,34 +500,57 @@ st.markdown("""
 
 col_left, col_sep, col_right = st.columns([1.2, 0.1, 2.7])
 
-# CỘT TRÁI: LIVE MONITORING
 with col_left:
     @st.fragment(run_every=30)
     def live_monitoring_panel():
         st.markdown('<div class="live-monitor-title"><span class="live-dot"></span> Giám sát Realtime</div>', unsafe_allow_html=True)
         alerts = get_api_alerts()
-        
+
         if not alerts:
             st.info("Chưa có cảnh báo nào từ API...")
         else:
-            for amt, prob, ts, src in alerts:
+            for row in alerts:
+                log_id, amt, prob, ts, src, confirmed = row
                 time_str = ts.strftime("%H:%M:%S") if isinstance(ts, datetime) else str(ts)
+                prob_str = prob if isinstance(prob, str) else f"{prob:.1%}"
+
+                if confirmed is True:
+                    badge = '<span style="background:#dcfce7;color:#16a34a;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">✓ ĐÃ XÁC NHẬN</span>'
+                elif confirmed is False:
+                    badge = '<span style="background:#fee2e2;color:#ef4444;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">✗ BÁO ĐỘNG GIẢ</span>'
+                else:
+                    badge = '<span style="background:#fef9c3;color:#ca8a04;font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;">⏳ CHỜ XÁC NHẬN</span>'
+
                 st.markdown(f"""
                 <div class="alert-card">
-                    <div class="alert-source">{src}</div>
+                    <div class="alert-source">{src} &nbsp;{badge}</div>
                     <div style="font-size:0.85rem; font-weight:600;">Giao dịch gian lận!</div>
-                    <div class="alert-meta">Số tiền: <b>€{amt:,.2f}</b> • Prob: <b>{prob if isinstance(prob, str) else f"{prob:.1%}"}</b><br>{time_str}</div>
+                    <div class="alert-meta">Số tiền: <b>€{amt:,.2f}</b> • Prob: <b>{prob_str}</b><br>{time_str}</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+                if confirmed is None:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("✅ Xác nhận", key=f"confirm_{log_id}", use_container_width=True):
+                            confirm_fraud_db(log_id, True)
+                            st.success("Đã xác nhận!")
+                            time.sleep(1)
+                            st.rerun()
+                    with c2:
+                        if st.button("❌ Báo giả", key=f"reject_{log_id}", use_container_width=True):
+                            confirm_fraud_db(log_id, False)
+                            st.info("Đã đánh dấu báo giả!")
+                            time.sleep(1)
+                            st.rerun()
+
         st.write("---")
 
     live_monitoring_panel()
 
-# CỘT GIỮA: VẠCH PHÂN CÁCH
 with col_sep:
     st.markdown('<div class="vertical-divider"></div>', unsafe_allow_html=True)
 
-# CỘT PHẢI: ANALYSIS CENTER
 with col_right:
     @st.fragment()
     def analysis_center_cloud():
@@ -519,9 +559,16 @@ with col_right:
         
         with tab1:
             st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-            c_base1, c_base2 = st.columns(2)
-            with c_base1: st.number_input("Số tiền", value=100.0, step=None, key="amt_cloud")
-            with c_base2: st.number_input("Thời gian", value=1000.0, step=None, key="time_cloud")
+            c_base1, b_base2 = st.columns([1, 1.2])
+            with c_base1:
+                st.number_input("Số tiền (Amount)", value=100.0, step=None, key="amt_cloud")
+            with b_base2:
+                st.markdown('<p style="margin:0 0 4px 0;font-weight:600;font-size:0.9rem;color:#1e293b">Giờ giao dịch (H:M:S)</p>', unsafe_allow_html=True)
+                tc1, tc2, tc3 = st.columns(3)
+                now = datetime.now()
+                with tc1: h = st.number_input("H", min_value=0, max_value=23, value=now.hour, key="h_cloud", label_visibility="collapsed")
+                with tc2: m = st.number_input("M", min_value=0, max_value=59, value=now.minute, key="m_cloud", label_visibility="collapsed")
+                with tc3: s = st.number_input("S", min_value=0, max_value=59, value=now.second, key="s_cloud", label_visibility="collapsed")
             
             selected_vs = st.multiselect(
                 "Chọn thêm đặc trưng để nhập dữ liệu:",
@@ -544,7 +591,8 @@ with col_right:
                     for v_name in selected_vs:
                         v_idx = int(v_name[1:])
                         v_feats[v_idx-1] = st.session_state[f"val_{v_name}_cloud"]
-                    res = process_prediction(st.session_state.amt_cloud, st.session_state.time_cloud, v_feats, source="HỆ THỐNG (Manual)")
+                    tx_time = f"{st.session_state.h_cloud:02d}:{st.session_state.m_cloud:02d}:{st.session_state.s_cloud:02d}"
+                    res = process_prediction(st.session_state.amt_cloud, tx_time, v_feats, source="HỆ THỐNG (Manual)")
                     if res:
                         if "BLOCK" in res['decision']:
                             st.error(f"Kết quả: GIAN LẬN ({res['prob']} gian lận)")
@@ -559,7 +607,6 @@ with col_right:
                 st.markdown('<div class="center-btn">', unsafe_allow_html=True)
                 if st.button("Quét toàn bộ tập tin", type="primary", key="scan_cloud"):
                     with st.spinner("Đang phân tích hàng loạt..."):
-                        # Nhận diện cột
                         amt_col = 'Amount' if 'Amount' in df.columns else 'scaled_amount'
                         time_col = 'Time' if 'Time' in df.columns else 'scaled_time'
                         
@@ -570,7 +617,6 @@ with col_right:
                         for start_idx in range(0, total_rows, batch_size):
                             end_idx = min(start_idx + batch_size, total_rows)
                             batch_df = df.iloc[start_idx:end_idx]
-                            
                             fraud_batch = process_bulk_cloud(batch_df, amt_col, time_col)
                             if not fraud_batch.empty:
                                 all_frauds.append(fraud_batch)
@@ -582,21 +628,17 @@ with col_right:
                             st.session_state.fraud_df_cloud = pd.DataFrame()
                             st.info(f"Hoàn tất! Không phát hiện gian lận trong {total_rows:,} giao dịch.")
 
-                # Hiển thị nút tải xuống nếu có kết quả
                 if 'fraud_df_cloud' in st.session_state and not st.session_state.fraud_df_cloud.empty:
                     st.write("---")
                     st.markdown('<p style="font-weight:600; color:#1e293b;">Xuất kết quả gian lận:</p>', unsafe_allow_html=True)
-                    
                     c1, c2 = st.columns([1, 1])
                     with c1:
                         fmt = st.selectbox("Định dạng file:", ["CSV", "Excel", "JSON"], key="fmt_cloud")
-                    
                     with c2:
-                        st.write("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Spacer
+                        st.write("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                         file_data = None
                         mime_type = ""
                         file_ext = fmt.lower()
-                        
                         if fmt == "CSV":
                             file_data = st.session_state.fraud_df_cloud.to_csv(index=False).encode('utf-8')
                             mime_type = "text/csv"
@@ -610,7 +652,6 @@ with col_right:
                         elif fmt == "JSON":
                             file_data = st.session_state.fraud_df_cloud.to_json(orient='records', indent=4).encode('utf-8')
                             mime_type = "application/json"
-
                         st.download_button(
                             label=f"Tải file {fmt}",
                             data=file_data,
