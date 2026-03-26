@@ -90,7 +90,7 @@ with col_left:
                                 st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{alert.get("source", "API")}</span>', unsafe_allow_html=True)
                             with h2:
                                 if confirmed is True:
-                                    st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
+                                    st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.5rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                                 else:
                                     if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True, type="primary"):
                                         try:
@@ -99,12 +99,11 @@ with col_left:
                                         except:
                                             st.error("Lỗi!")
                             
-                            # Body
+                            # Body (Compact)
                             st.markdown(f"""
-                                <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-top: 4px;">Giao dịch gian lận!</div>
-                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
-                                    Số tiền: <b>€{alert.get('amount', 0):,.2f}</b> • Prob: <b>{alert.get('fraud_probability', 0):.1%}</b><br>
-                                    🕒 {time_display}
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #1e293b; margin: 2px 0 0 0;">Giao dịch gian lận!</div>
+                                <div style="font-size: 0.72rem; color: #64748b; margin: 0;">
+                                    Số tiền: <b>€{alert.get('amount', 0):,.2f}</b> • Prob: <b>{alert.get('fraud_probability', 0):.1%}</b> | 🕒 {time_display}
                                 </div>
                             """, unsafe_allow_html=True)
         except:

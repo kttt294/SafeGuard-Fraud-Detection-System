@@ -137,8 +137,8 @@ CSS_EMBEDDED = """
     background-color: #38bdf8 !important;
     color: white !important; border-radius: 6px !important;
     border: none !important; font-weight: 600 !important;
-    font-size: 0.8rem !important;
-    height: 28px !important;
+    font-size: 0.6rem !important; /* Siêu nhỏ */
+    height: 24px !important; /* Hạ thêm độ cao */
     line-height: 1 !important;
     transition: all 0.2s ease !important;
 }
@@ -536,7 +536,7 @@ with col_left:
                         st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{src}</span>', unsafe_allow_html=True)
                     with h2:
                         if confirmed is True:
-                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
+                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.5rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                         else:
                             if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                 confirm_fraud_db(log_id, True)

@@ -161,8 +161,15 @@
     background-color: #38bdf8 !important;
     color: white !important; border-radius: 6px !important;
     border: none !important; font-weight: 600 !important;
-    font-size: 0.85rem !important; /* Nhỏ hơn một chút để tránh tràn chữ */
+    font-size: 0.6rem !important; /* Siêu nhỏ */
+    height: 24px !important; /* Hạ độ cao */
+    line-height: 1 !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Thu nhỏ padding của khung viền Alert Card */
+div[data-testid="stVerticalBlockBorderWrapper"] > div {
+    padding: 0.5rem 0.8rem !important;
 }
 
 /* Thu nhỏ và căn giữa vùng tải file */
