@@ -132,7 +132,8 @@ CSS_EMBEDDED = """
     justify-content: center;
 }
 
-.stButton button {
+/* Nút phụ - Xác nhận (Gray, Mini) */
+.stButton button[kind="secondary"] {
     width: 100% !important; 
     max-width: 90px !important;
     margin-left: auto !important;
@@ -143,21 +144,23 @@ CSS_EMBEDDED = """
     height: 22px !important;
     line-height: 1 !important;
     padding: 0 !important;
-    transition: all 0.2s ease !important;
-}
-
-/* Nút phụ - Xác nhận (Gray) */
-.stButton button[kind="secondary"] {
     background-color: #f1f5f9 !important;
     color: #475569 !important;
     border: 1px solid #e2e8f0 !important;
+    transition: all 0.2s ease !important;
 }
 
-/* Nút chính - Phân tích (Blue) */
+/* Nút chính - Phân tích (Blue, To rõ ràng như cũ) */
 .stButton button[kind="primary"] {
+    width: 100% !important; 
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important; /* To như bình thường */
+    height: 38px !important; /* Chiều cao chuẩn */
     background-color: #38bdf8 !important;
     color: white !important;
     border: none !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
 }
 
 .stButton button:hover {
@@ -557,7 +560,7 @@ with col_left:
                         st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{src}</span>', unsafe_allow_html=True)
                     with h2:
                         if confirmed is True:
-                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:1.0rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
+                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.75rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                         else:
                             if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                 confirm_fraud_db(log_id, True)
