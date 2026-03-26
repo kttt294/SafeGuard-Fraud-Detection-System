@@ -20,16 +20,34 @@ if os.path.exists(css_path):
 # Thêm Inline CSS để cưỡng ép giao diện nút bấm giống bản Cloud
 st.markdown("""
 <style>
-.stButton > button[data-testid="stBaseButton-primary"] {
+.stButton > button {
     width: 100% !important; 
-    background-color: #38bdf8 !important;
-    color: white !important; border-radius: 6px !important;
-    border: none !important; font-weight: 600 !important;
-    font-size: 0.6rem !important;
-    height: 24px !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 0.55rem !important;
+    height: 22px !important;
     line-height: 1 !important;
     transition: all 0.2s ease !important;
 }
+
+/* Nút phụ - Xác nhận (Gray) */
+.stButton > button[data-testid="stBaseButton-secondary"] {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+/* Nút chính - Phân tích (Blue) */
+.stButton > button[data-testid="stBaseButton-primary"] {
+    background-color: #38bdf8 !important;
+    color: white !important;
+    border: none !important;
+}
+
+.stButton > button:hover {
+    filter: brightness(0.95);
+}
+
 div[data-testid="stVerticalBlockBorderWrapper"] > div {
     padding: 0.5rem 0.8rem !important;
 }
@@ -117,7 +135,7 @@ with col_left:
                                 if confirmed is True:
                                     st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.5rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                                 else:
-                                    if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True, type="primary"):
+                                    if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                         try:
                                             requests.put(f"{API_BASE_URL}/confirm-fraud/{log_id}", json={"is_fraud": True}, timeout=3)
                                             st.rerun()
@@ -305,7 +323,8 @@ with col_right:
                             data=file_data,
                             file_name=f"local_detected_frauds_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_ext}",
                             mime=mime_type,
-                            use_container_width=True
+                            use_container_width=True,
+                            type="primary"
                         )
 
     analysis_center_frontend()

@@ -134,20 +134,30 @@ CSS_EMBEDDED = """
 
 .stButton > button {
     width: 100% !important; 
-    background-color: #f1f5f9 !important; /* Xám nhạt */
-    color: #475569 !important; /* Chữ xám đậm */
     border-radius: 6px !important;
-    border: 1px solid #e2e8f0 !important;
     font-weight: 600 !important;
-    font-size: 0.55rem !important; /* Thu nhỏ cỡ chữ thêm chút nữa */
-    height: 22px !important; /* Hạ thêm độ cao nhẹ */
+    font-size: 0.55rem !important;
+    height: 22px !important;
     line-height: 1 !important;
     transition: all 0.2s ease !important;
 }
 
+/* Nút phụ - Xác nhận (Gray) */
+.stButton > button[data-testid="stBaseButton-secondary"] {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+/* Nút chính - Phân tích (Blue) */
+.stButton > button[data-testid="stBaseButton-primary"] {
+    background-color: #38bdf8 !important;
+    color: white !important;
+    border: none !important;
+}
+
 .stButton > button:hover {
-    background-color: #e2e8f0 !important;
-    border-color: #cbd5e1 !important;
+    filter: brightness(0.95);
 }
 
 /* Thu nhỏ padding của khung viền Alert Card */
@@ -545,7 +555,7 @@ with col_left:
                         if confirmed is True:
                             st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.5rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                         else:
-                            if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True, type="primary"):
+                            if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                 confirm_fraud_db(log_id, True)
                                 st.rerun()
 
