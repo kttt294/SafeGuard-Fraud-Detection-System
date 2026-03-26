@@ -20,31 +20,35 @@ if os.path.exists(css_path):
 # Thêm Inline CSS để cưỡng ép giao diện nút bấm giống bản Cloud
 st.markdown("""
 <style>
-.stButton > button {
+.stButton button {
     width: 100% !important; 
+    max-width: 90px !important; /* Giới hạn độ rộng để không bị thô */
+    margin-left: auto !important;
+    display: block !important;
     border-radius: 6px !important;
     font-weight: 600 !important;
     font-size: 0.55rem !important;
     height: 22px !important;
     line-height: 1 !important;
+    padding: 0 !important;
     transition: all 0.2s ease !important;
 }
 
 /* Nút phụ - Xác nhận (Gray) */
-.stButton > button[data-testid="stBaseButton-secondary"] {
+.stButton button[kind="secondary"] {
     background-color: #f1f5f9 !important;
     color: #475569 !important;
     border: 1px solid #e2e8f0 !important;
 }
 
 /* Nút chính - Phân tích (Blue) */
-.stButton > button[data-testid="stBaseButton-primary"] {
+.stButton button[kind="primary"] {
     background-color: #38bdf8 !important;
     color: white !important;
     border: none !important;
 }
 
-.stButton > button:hover {
+.stButton button:hover {
     filter: brightness(0.95);
 }
 
@@ -133,7 +137,7 @@ with col_left:
                                 st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{alert.get("source", "API")}</span>', unsafe_allow_html=True)
                             with h2:
                                 if confirmed is True:
-                                    st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.5rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
+                                    st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:1.0rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                                 else:
                                     if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                         try:
@@ -213,27 +217,32 @@ with col_right:
             
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Bắt đầu phân tích", type="primary", key="btn_front"):
-                with st.spinner("Đang phân tích..."):
-                    tx_time = f"{st.session_state.h_front:02d}:{st.session_state.m_front:02d}:{st.session_state.s_front:02d}"
-                    payload = {
-                        "amount": st.session_state.amt_front,
-                        "transaction_time": tx_time,
-                        "v_features": [0.0]*28,
-                        "source": "Phân tích Thủ công"
-                    }
-                    # Thu thập tất cả các V-features đã chọn
-                    for v_name in selected_vs:
-                        v_idx = int(v_name[1:])
-                        payload["v_features"][v_idx-1] = st.session_state[f"val_{v_name}_front"]
+                try:
+                    with st.spinner("Đang xử lý dữ liệu..."):
+                        tx_time = f"{st.session_state.h_front:02d}:{st.session_state.m_front:02d}:{st.session_state.s_front:02d}"
+                        payload = {
+                            "amount": st.session_state.amt_front,
+                            "transaction_time": tx_time,
+                            "v_features": [0.0]*28,
+                            "source": "Phân tích Thủ công"
+                        }
+                        # Thu thập tất cả các V-features đã chọn
+                        for v_name in selected_vs:
+                            v_idx = int(v_name[1:])
+                            payload["v_features"][v_idx-1] = st.session_state[f"val_{v_name}_front"]
+                        
+                        # Thêm Timeout 3s để tránh bị treo nút bấm
+                        res_all = requests.post(f"{API_BASE_URL}/verify", json=payload, timeout=3).json()
                     
-                    try:
-                        res = requests.post(f"{API_BASE_URL}/verify", json=payload, timeout=5).json()
-                        if res.get("decision") == "BLOCK":
-                            st.error(f"Kết quả: GIAN LẬN ({res.get('probability')} gian lận)")
-                        else:
-                            st.success(f"Kết quả: HỢP LỆ ({res.get('probability')} gian lận)")
-                    except:
-                        st.error("Không thể kết nối đến Backend API!")
+                    # Hiển thị kết quả ngoài spinner để đảm bảo UX
+                    if res_all.get("decision") == "BLOCK":
+                        st.error(f"⚠️ CẢNH BÁO: GIAN LẬN ({res_all.get('probability')} xác suất)")
+                    else:
+                        st.success(f"✅ HỢP LỆ ({res_all.get('probability')} xác suất gian lận)")
+                except requests.exceptions.Timeout:
+                    st.error("⏳ Lỗi: Backend phản hồi quá chậm (Timeout 3s).")
+                except Exception as e:
+                    st.error(f"❌ Lỗi kết nối: {str(e)}")
         
         with tab2:
             up = st.file_uploader("Chọn file CSV", type="csv", key="file_front", label_visibility="collapsed")

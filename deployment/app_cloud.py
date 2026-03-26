@@ -132,31 +132,35 @@ CSS_EMBEDDED = """
     justify-content: center;
 }
 
-.stButton > button {
+.stButton button {
     width: 100% !important; 
+    max-width: 90px !important;
+    margin-left: auto !important;
+    display: block !important;
     border-radius: 6px !important;
     font-weight: 600 !important;
     font-size: 0.55rem !important;
     height: 22px !important;
     line-height: 1 !important;
+    padding: 0 !important;
     transition: all 0.2s ease !important;
 }
 
 /* Nút phụ - Xác nhận (Gray) */
-.stButton > button[data-testid="stBaseButton-secondary"] {
+.stButton button[kind="secondary"] {
     background-color: #f1f5f9 !important;
     color: #475569 !important;
     border: 1px solid #e2e8f0 !important;
 }
 
 /* Nút chính - Phân tích (Blue) */
-.stButton > button[data-testid="stBaseButton-primary"] {
+.stButton button[kind="primary"] {
     background-color: #38bdf8 !important;
     color: white !important;
     border: none !important;
 }
 
-.stButton > button:hover {
+.stButton button:hover {
     filter: brightness(0.95);
 }
 
@@ -553,7 +557,7 @@ with col_left:
                         st.markdown(f'<span style="font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase;">{src}</span>', unsafe_allow_html=True)
                     with h2:
                         if confirmed is True:
-                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:0.5rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
+                            st.markdown('<span style="background:#dcfce7;color:#16a34a;font-size:1.0rem;font-weight:700;padding:2px 4px;border-radius:4px;display:block;text-align:center;">✓ ĐÃ XÁC NHẬN</span>', unsafe_allow_html=True)
                         else:
                             if st.button("Xác nhận", key=f"conf_btn_{log_id}", use_container_width=True):
                                 confirm_fraud_db(log_id, True)
