@@ -204,7 +204,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] > div {
     margin-bottom: 1rem;
 }
 
-/* FIX: Nút Xác nhận / Báo giả trong alert cards — width auto, không bóp méo */
+/* FIX: Nút Xác nhận / Báo giả trong alert cards — width auto */
 .stButton > button[data-testid="stBaseButton-secondary"] {
     background-color: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
@@ -214,7 +214,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] > div {
     font-weight: 600 !important;
     padding: 2px 8px !important;
     min-width: unset !important;
-    width: auto !important;
+    width: 80% !important;
     height: 24px !important;
     border-radius: 4px !important;
     transition: all 0.2s ease !important;
