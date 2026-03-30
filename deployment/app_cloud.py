@@ -206,17 +206,17 @@ div[data-testid="stVerticalBlockBorderWrapper"] > div {
 
 /* 1. Nhắm vào chính cái nút */
 .stButton > button[data-testid="stBaseButton-secondary"] {
-    height: 25px !important;       /* Cố định chiều cao thấp */
+    height: 20px !important;       /* Cố định chiều cao thấp */
     min-width: 60px !important;    /* Chiều rộng tối thiểu vừa đủ */
     width: auto !important;
     padding: 0px 10px !important;  /* Chỉ để padding trái phải, trên dưới bằng 0 */
-    line-height: 25px !important;  /* Bằng với height để căn giữa chữ */
+    line-height: 20px !important;  /* Bằng với height để căn giữa chữ */
     border-radius: 4px !important;
 }
 
 /* 2. QUAN TRỌNG: Nhắm vào thẻ chữ bên trong nút để thu nhỏ text */
 .stButton > button[data-testid="stBaseButton-secondary"] p {
-    font-size: 11px !important;    /* Chỉnh chữ cực nhỏ */
+    font-size: 12px !important;    /* Chỉnh chữ cực nhỏ */
     margin: 0 !important;          /* Xóa bỏ margin mặc định của Streamlit (Đây là thủ phạm làm nút to) */
     padding: 0 !important;         /* Xóa padding của chữ */
     line-height: 1.1 !important;
