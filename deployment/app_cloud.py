@@ -204,23 +204,27 @@ div[data-testid="stVerticalBlockBorderWrapper"] > div {
     margin-bottom: 1rem;
 }
 
-/* 1. Nhắm vào chính cái nút */
+/* 1. Ép chiều cao nút chính xác */
 .stButton > button[data-testid="stBaseButton-secondary"] {
-    height: 17px !important;       /* Cố định chiều cao thấp */
-    min-width: 60px !important;    /* Chiều rộng tối thiểu vừa đủ */
-    width: auto !important;
-    padding: 0px 10px !important;  /* Chỉ để padding trái phải, trên dưới bằng 0 */
-    line-height: 17px !important;  /* Bằng với height để căn giữa chữ */
+    height: 28px !important;       /* Chiều cao thấp tương đương nút xanh */
+    min-height: 28px !important;   /* Quan trọng: Ghi đè min-height mặc định của Streamlit */
+    line-height: 28px !important;
+    padding: 0px 12px !important;  /* Giảm padding trên dưới về 0 */
+    
     border-radius: 4px !important;
+    background-color: #f1f5f9 !important; /* Màu nền xám nhạt */
+    border: 1px solid #e2e8f0 !important;
 }
 
-/* 2. QUAN TRỌNG: Nhắm vào thẻ chữ bên trong nút để thu nhỏ text */
+/* 2. Triệt tiêu khoảng trống thừa của chữ bên trong */
 .stButton > button[data-testid="stBaseButton-secondary"] p {
-    font-size: 12px !important;    /* Chỉnh chữ cực nhỏ */
-    margin: 0 !important;          /* Xóa bỏ margin mặc định của Streamlit (Đây là thủ phạm làm nút to) */
-    padding: 0 !important;         /* Xóa padding của chữ */
-    line-height: 1.1 !important;
-    text-transform: none !important; /* Tránh việc tự động viết hoa làm nút to thêm */
+    font-size: 0.75rem !important; /* Cỡ chữ nhỏ lại */
+    margin-top: 0 !important;      /* Xóa lề trên */
+    margin-bottom: 0 !important;   /* Xóa lề dưới */
+    padding: 0 !important;
+    line-height: 1 !important;     /* Ép dòng chữ không chiếm thêm không gian */
+    font-weight: 600 !important;
+    text-transform: none !important; /* Giữ nguyên chữ thường/hoa */
 }
 
 .stButton > button[data-testid="stBaseButton-secondary"]:hover {
