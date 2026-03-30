@@ -661,8 +661,10 @@ with col_right:
             if up:
                 df = load_csv_data(up)
                 st.dataframe(df.head(), use_container_width=True)
-                st.markdown('<div class="center-btn">', unsafe_allow_html=True)
-                if st.button("Quét toàn bộ tập tin", type="primary", key="scan_cloud"):
+                _, scan_col, _ = st.columns([1, 2, 1])
+                with scan_col:
+                    scan_clicked = st.button("Quét toàn bộ tập tin", type="primary", key="scan_cloud", use_container_width=True)
+                if scan_clicked:
                     with st.spinner("Đang phân tích hàng loạt..."):
                         amt_col = 'Amount' if 'Amount' in df.columns else 'scaled_amount'
                         time_col = 'Time' if 'Time' in df.columns else 'scaled_time'
