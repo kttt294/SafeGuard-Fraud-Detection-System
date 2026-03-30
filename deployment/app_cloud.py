@@ -206,11 +206,11 @@ div[data-testid="stVerticalBlockBorderWrapper"] > div {
 
 /* 1. Nhắm vào chính cái nút */
 .stButton > button[data-testid="stBaseButton-secondary"] {
-    height: 20px !important;       /* Cố định chiều cao thấp */
+    height: 17px !important;       /* Cố định chiều cao thấp */
     min-width: 60px !important;    /* Chiều rộng tối thiểu vừa đủ */
     width: auto !important;
     padding: 0px 10px !important;  /* Chỉ để padding trái phải, trên dưới bằng 0 */
-    line-height: 20px !important;  /* Bằng với height để căn giữa chữ */
+    line-height: 17px !important;  /* Bằng với height để căn giữa chữ */
     border-radius: 4px !important;
 }
 
