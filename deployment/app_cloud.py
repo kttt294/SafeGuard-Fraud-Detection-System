@@ -204,24 +204,23 @@ div[data-testid="stVerticalBlockBorderWrapper"] > div {
     margin-bottom: 1rem;
 }
 
-/* FIX: Nút Xác nhận / Báo giả trong alert cards — width auto */
+/* 1. Nhắm vào chính cái nút */
 .stButton > button[data-testid="stBaseButton-secondary"] {
-    background-color: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    box-shadow: none !important;
-    color: #64748b !important;
-    font-size: 0.05rem !important;
-    font-weight: 600 !important;
-    padding: 2px 8px !important;
-    min-width: unset !important;
-    width: 10% !important;
-    height: 20px !important;
+    height: 25px !important;       /* Cố định chiều cao thấp */
+    min-width: 60px !important;    /* Chiều rộng tối thiểu vừa đủ */
+    width: auto !important;
+    padding: 0px 10px !important;  /* Chỉ để padding trái phải, trên dưới bằng 0 */
+    line-height: 25px !important;  /* Bằng với height để căn giữa chữ */
     border-radius: 4px !important;
-    transition: all 0.2s ease !important;
-    white-space: nowrap !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
-    line-height: 1.4 !important;
+}
+
+/* 2. QUAN TRỌNG: Nhắm vào thẻ chữ bên trong nút để thu nhỏ text */
+.stButton > button[data-testid="stBaseButton-secondary"] p {
+    font-size: 11px !important;    /* Chỉnh chữ cực nhỏ */
+    margin: 0 !important;          /* Xóa bỏ margin mặc định của Streamlit (Đây là thủ phạm làm nút to) */
+    padding: 0 !important;         /* Xóa padding của chữ */
+    line-height: 1.1 !important;
+    text-transform: none !important; /* Tránh việc tự động viết hoa làm nút to thêm */
 }
 
 .stButton > button[data-testid="stBaseButton-secondary"]:hover {
