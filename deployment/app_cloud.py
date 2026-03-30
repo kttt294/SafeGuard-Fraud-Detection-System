@@ -214,7 +214,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] > div {
     font-weight: 600 !important;
     padding: 2px 8px !important;
     min-width: unset !important;
-    width: 80% !important;
+    width: 10% !important;
     height: 20px !important;
     border-radius: 4px !important;
     transition: all 0.2s ease !important;
