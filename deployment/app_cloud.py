@@ -595,7 +595,9 @@ def process_bulk_cloud(df, amt_col, time_col, source="HỆ THỐNG (Bulk)"):
     V = df[[f'V{i}' for i in range(1, 29)]].values
     input_array = np.hstack([X, V])
     
-    probs = model.predict_proba(input_array)[:, 1]
+    input_df = pd.DataFrame(input_array, columns=FEATURE_COLUMNS)
+    probs = model.predict_proba(input_df)[:, 1]
+    
     fraud_indices = np.where(probs > 0.5)[0]
     fraud_count = len(fraud_indices)
     
