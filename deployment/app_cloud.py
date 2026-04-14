@@ -1,15 +1,10 @@
-"""
-File phục vụ mục đích Deploy ứng dụng Fraud Detection lên Streamlit Cloud.
-Dashboard quản trị: Theo dõi API Real-time & Phân tích Giao dịch.
-"""
-
+import sys
 import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
 import os
 import shutil
-import sys
 import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
@@ -20,7 +15,6 @@ from datetime import datetime
 import io
 import xgboost as xgb
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.isotonic import IsotonicRegression
 
 # --- 1. CONFIG & SETUP ---
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
@@ -287,101 +281,111 @@ st.markdown(CSS_EMBEDDED, unsafe_allow_html=True)
 FEATURE_COLUMNS = ['scaled_amount', 'scaled_time'] + [f'V{i}' for i in range(1, 29)]
 
 # =============================================================
-# Custom classes: định nghĩa lại để CustomUnpickler resolve được
+# Định nghĩa lại các Class để load model.pkl (bất kể module name)
 # =============================================================
+
 class FocalXGB(BaseEstimator, ClassifierMixin):
-    def __init__(self, alpha=0.9, gamma=1.25, max_depth=6, learning_rate=0.1,
-                 n_estimators=100, threshold=0.5):
-        self.alpha = alpha; self.gamma = gamma; self.max_depth = max_depth
-        self.learning_rate = learning_rate; self.n_estimators = n_estimators
+    def __init__(self, alpha=0.9, gamma=1.25, max_depth=6, learning_rate=0.1, n_estimators=100, threshold=0.5):
+        self.alpha = alpha
+        self.gamma = gamma
+        self.max_depth = max_depth
+        self.learning_rate = learning_rate
+        self.n_estimators = n_estimators
         self.threshold = threshold
 
     def _focal_loss_obj(self, predt, dtrain):
         label = dtrain.get_label()
-        p = np.clip(1.0 / (1.0 + np.exp(-predt)), 1e-6, 1 - 1e-6)
-        w = self.alpha * (p**self.gamma) + (1 - self.alpha) * ((1-p)**self.gamma)
-        return w * (p - label), np.maximum(w * p * (1 - p), 1e-6)
+        p = 1.0 / (1.0 + np.exp(-predt))
+        p = np.clip(p, 1e-6, 1.0 - 1e-6)
+        # p_t & alpha_t được tính theo code người dùng cung cấp
+        p_t = np.where(label == 1, p, 1 - p)
+        alpha_t = np.where(label == 1, self.alpha, 1 - self.alpha)
+        weight = self.alpha * (p**self.gamma) + (1-self.alpha) * ((1-p)**self.gamma)
+        grad = weight * (p-label)
+        hess = weight * p*(1-p)
+        hess = np.maximum(hess, 1e-6)
+        return grad, hess
 
     def fit(self, X, y):
         self.classes_ = np.array([0, 1])
         dtrain = xgb.DMatrix(X, label=y)
-        params = {'max_depth': self.max_depth, 'eta': self.learning_rate, 'verbosity': 0}
-        self.model = xgb.train(params, dtrain, num_boost_round=self.n_estimators,
-                               obj=self._focal_loss_obj)
+        params = {
+            'max_depth': self.max_depth,
+            'eta': self.learning_rate,
+            'verbosity': 0
+        }
+        self.model = xgb.train(params, dtrain, num_boost_round=self.n_estimators, obj=self._focal_loss_obj)
         return self
 
     def predict_proba(self, X):
-        raw = self.model.predict(xgb.DMatrix(X))
-        p = 1.0 / (1.0 + np.exp(-raw))
-        return np.vstack([1 - p, p]).T
+        dtest = xgb.DMatrix(X)
+        raw_preds = self.model.predict(dtest)
+        proba = 1.0 / (1.0 + np.exp(-raw_preds))
+        return np.vstack([1 - proba, proba]).T
 
     def predict(self, X):
         return (self.predict_proba(X)[:, 1] >= self.threshold).astype(int)
 
 
 class FocalEnsembleXGB(BaseEstimator, ClassifierMixin):
-    def __init__(self, alpha=0.9, gamma_wide=1.0, gamma_deep=2.0, ensemble_weight=0.5,
-                 max_depth=6, learning_rate=0.1, n_estimators=100, threshold=0.5):
-        self.alpha = alpha; self.gamma_wide = gamma_wide; self.gamma_deep = gamma_deep
-        self.ensemble_weight = ensemble_weight; self.max_depth = max_depth
-        self.learning_rate = learning_rate; self.n_estimators = n_estimators
+    def __init__(self, alpha=0.9, gamma_wide=1.0, gamma_deep=2.0, ensemble_weight=0.5, max_depth=6, learning_rate=0.1, n_estimators=100, threshold=0.5):
+        self.alpha = alpha
+        self.gamma_wide = gamma_wide
+        self.gamma_deep = gamma_deep
+        self.ensemble_weight = ensemble_weight
+        self.max_depth = max_depth
+        self.learning_rate = learning_rate
+        self.n_estimators = n_estimators
         self.threshold = threshold
 
     def fit(self, X, y):
         self.classes_ = np.array([0, 1])
-        kw = dict(alpha=self.alpha, max_depth=self.max_depth,
-                  learning_rate=self.learning_rate, n_estimators=self.n_estimators)
-        self.model_wide = FocalXGB(gamma=self.gamma_wide, **kw)
-        self.model_deep = FocalXGB(gamma=self.gamma_deep, **kw)
-        self.model_wide.fit(X, y); self.model_deep.fit(X, y)
+        # Tạo 2 model FocalXGB đơn lẻ
+        self.model_wide = FocalXGB(alpha=self.alpha, gamma=self.gamma_wide, max_depth=self.max_depth, learning_rate=self.learning_rate, n_estimators=self.n_estimators)
+        self.model_deep = FocalXGB(alpha=self.alpha, gamma=self.gamma_deep, max_depth=self.max_depth, learning_rate=self.learning_rate, n_estimators=self.n_estimators)
+
+        self.model_wide.fit(X, y)
+        self.model_deep.fit(X, y)
         return self
 
     def predict_proba(self, X):
+        # Trung bình cộng xác suất (Soft Voting)
+        p_wide = self.model_wide.predict_proba(X)[:, 1]
+        p_deep = self.model_deep.predict_proba(X)[:, 1]
         w = self.ensemble_weight
-        avg = w * self.model_deep.predict_proba(X)[:, 1] + \
-              (1 - w) * self.model_wide.predict_proba(X)[:, 1]
-        return np.vstack([1 - avg, avg]).T
+        avg_proba = w*p_deep + (1-w)*p_wide
+        return np.vstack([1 - avg_proba, avg_proba]).T
 
     def predict(self, X):
         return (self.predict_proba(X)[:, 1] >= self.threshold).astype(int)
 
-
 class AutoTunerCV(BaseEstimator, ClassifierMixin):
-    """Stub đủ để load model.pkl cũ được pickle bằng AutoTunerCV."""
-    def __init__(self, estimator=None, param_distributions=None, n_splits=5,
-                 scoring="average_precision", threshold_metric="f1",
-                 n_iter=20, random_state=42, n_jobs=None):
-        self.estimator = estimator; self.param_distributions = param_distributions
-        self.n_splits = n_splits; self.scoring = scoring
-        self.threshold_metric = threshold_metric; self.n_iter = n_iter
-        self.random_state = random_state; self.n_jobs = n_jobs
-
+    """Stub để tương thích nếu load model đã qua AutoTunerCV."""
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items(): setattr(self, k, v)
     def predict_proba(self, X):
         raw = self.model_.predict_proba(X)[:, 1]
-        return np.vstack([1 - self.calibrator_.predict(raw),
-                          self.calibrator_.predict(raw)]).T
-
+        cal = self.calibrator_.predict(raw)
+        return np.vstack([1.0 - cal, cal]).T
     def predict(self, X):
-        return self.classes_[(self.predict_proba(X)[:, 1] > self.best_threshold_).astype(int)]
-
+        probs = self.predict_proba(X)[:, 1]
+        return (probs > self.best_threshold_).astype(int)
 
 class _CustomUnpickler(pickle.Unpickler):
-    """Resolve custom class theo tên, bất kể module name trên Streamlit Cloud."""
     _MAP = {
         'FocalXGB': FocalXGB,
         'FocalEnsembleXGB': FocalEnsembleXGB,
         'AutoTunerCV': AutoTunerCV,
     }
     def find_class(self, module, name):
-        if name in self._MAP:
-            return self._MAP[name]
+        if name in self._MAP: return self._MAP[name]
         return super().find_class(module, name)
-
 
 @st.cache_resource
 def load_model():
     model_path = 'modeling/model.pkl'
     model_url = "https://github.com/kttt294/SafeGuard-Fraud-Detection-System/releases/download/v1.0.0/model.pkl"
+    
     try:
         if not os.path.exists(model_path):
             os.makedirs('modeling', exist_ok=True)
@@ -394,6 +398,7 @@ def load_model():
                 else:
                     st.error(f"Lỗi khi tải model: HTTP {response.status_code}")
                     return None
+
         if os.path.exists(model_path):
             with open(model_path, 'rb') as f:
                 return _CustomUnpickler(f).load()
@@ -402,7 +407,6 @@ def load_model():
     return None
 
 model = load_model()
-
 
 @st.cache_resource
 def load_scaler():
